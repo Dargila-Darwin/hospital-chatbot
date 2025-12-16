@@ -1,5 +1,6 @@
 import streamlit as st
 from datetime import datetime
+import re
 from chatbot import (
     run_chatbot_query,
     extract_doctor_name,
@@ -17,7 +18,7 @@ st.set_page_config(
 )
 
 # ===============================
-# TITLE (ALWAYS AT TOP)
+# TITLE
 # ===============================
 st.markdown(
     """
@@ -86,23 +87,31 @@ if "booking" not in st.session_state:
     }
 
 # ===============================
-# HELPER: FORMAT DOCTOR LIST
+# HELPER: FORMAT DOCTORS (FIXED)
 # ===============================
 def format_doctor_list(text: str) -> str:
     """
-    Ensures each doctor starts on a new line.
+    Converts:
+    Dr. A ... Dr. B ... Dr. C ...
+    into:
+    Dr. A ...
+    Dr. B ...
+    Dr. C ...
     """
-    return text.replace(" Dr.", "\nDr.")
+    doctors = re.findall(r"Dr\. [A-Za-z\s]+? - [0-9\.AMPto\s]+", text)
+    if doctors:
+        return "\n".join(doctors)
+    return text
 
 # ===============================
-# CHAT HISTORY (SCROLLS UP)
+# CHAT HISTORY
 # ===============================
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
 # ===============================
-# INPUT (FIXED AT BOTTOM)
+# INPUT (BOTTOM)
 # ===============================
 user_input = st.chat_input("Type your message here…")
 
@@ -110,7 +119,6 @@ user_input = st.chat_input("Type your message here…")
 # CHAT + BOOKING LOGIC
 # ===============================
 if user_input:
-    # Show user message
     st.session_state.messages.append({
         "role": "user",
         "content": user_input
@@ -157,7 +165,6 @@ if user_input:
                     booking["time"]
                 )
 
-                # Reset booking
                 st.session_state.booking = {
                     "active": False,
                     "doctor": None,
@@ -171,13 +178,11 @@ if user_input:
     # ---------- NORMAL CHAT ----------
     else:
         reply = run_chatbot_query(user_input)
-        reply = format_doctor_list(reply)   # 👈 ONLY CHANGE APPLIED
+        reply = format_doctor_list(reply)  # ✅ FIX APPLIED HERE
 
-    # Show bot reply
     st.session_state.messages.append({
         "role": "assistant",
         "content": reply
     })
 
-    # Rerun to move chat upward
     st.rerun()
