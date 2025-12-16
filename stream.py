@@ -86,6 +86,15 @@ if "booking" not in st.session_state:
     }
 
 # ===============================
+# HELPER: FORMAT DOCTOR LIST
+# ===============================
+def format_doctor_list(text: str) -> str:
+    """
+    Ensures each doctor starts on a new line.
+    """
+    return text.replace(" Dr.", "\nDr.")
+
+# ===============================
 # CHAT HISTORY (SCROLLS UP)
 # ===============================
 for msg in st.session_state.messages:
@@ -162,6 +171,7 @@ if user_input:
     # ---------- NORMAL CHAT ----------
     else:
         reply = run_chatbot_query(user_input)
+        reply = format_doctor_list(reply)   # 👈 ONLY CHANGE APPLIED
 
     # Show bot reply
     st.session_state.messages.append({
