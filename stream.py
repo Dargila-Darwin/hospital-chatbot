@@ -18,7 +18,7 @@ st.set_page_config(
 )
 
 # ===============================
-# BACKGROUND IMAGE
+# BACKGROUND IMAGE + GLOBAL CSS FIX
 # ===============================
 def set_bg(image_path):
     with open(image_path, "rb") as f:
@@ -27,13 +27,18 @@ def set_bg(image_path):
     st.markdown(
         f"""
         <style>
+        /* REMOVE STREAMLIT DEFAULT PADDING (THIS FIXES WHITE SPACE) */
+        .block-container {{
+            padding-top: 0rem !important;
+        }}
+
         .stApp {{
             background: url("data:image/jpg;base64,{img}");
             background-size: cover;
             background-attachment: fixed;
         }}
 
-        /* HEADER */
+        /* FIXED HEADER */
         .header {{
             position: fixed;
             top: 0;
@@ -45,14 +50,14 @@ def set_bg(image_path):
             font-size: 26px;
             font-weight: bold;
             color: #084298;
-            padding-top: 15px;
+            line-height: 70px;
             z-index: 1000;
             border-bottom: 2px solid #ccc;
         }}
 
         /* CHAT AREA */
         .chat {{
-            margin-top: 90px;
+            margin-top: 80px;   /* JUST BELOW HEADER */
             margin-bottom: 90px;
             max-width: 900px;
             margin-left: auto;
@@ -85,7 +90,7 @@ def set_bg(image_path):
             max-width: 70%;
         }}
 
-        /* INPUT BAR */
+        /* INPUT BAR FIXED */
         .input {{
             position: fixed;
             bottom: 0;
@@ -110,9 +115,7 @@ with st.sidebar:
     st.markdown("## 🏥 PRS Hospital")
 
     with st.expander("ℹ️ About"):
-        st.write(
-            "PRS Hospital, Trivandrum – 37+ years of excellence in healthcare."
-        )
+        st.write("PRS Hospital, Trivandrum – 37+ years of excellence in healthcare.")
 
     with st.expander("🩺 Specialities"):
         st.write("""
@@ -141,7 +144,7 @@ if "booking" not in st.session_state:
     }
 
 # ===============================
-# HEADER
+# FIXED HEADER (ALWAYS VISIBLE)
 # ===============================
 st.markdown(
     '<div class="header">PRS Hospital – Chatbot Assistant</div>',
@@ -165,24 +168,20 @@ for msg in st.session_state.messages:
 st.markdown('</div>', unsafe_allow_html=True)
 
 # ===============================
-# INPUT (FIXED)
+# INPUT FIXED AT BOTTOM
 # ===============================
 st.markdown('<div class="input">', unsafe_allow_html=True)
-user_input = st.chat_input("Type your message here...")
+user_input = st.chat_input("Type your message here…")
 st.markdown('</div>', unsafe_allow_html=True)
 
 # ===============================
-# CHAT LOGIC + BOOKING
+# CHAT + BOOKING LOGIC
 # ===============================
 if user_input:
-    st.session_state.messages.append({
-        "role": "user",
-        "content": user_input
-    })
+    st.session_state.messages.append({"role": "user", "content": user_input})
 
     booking = st.session_state.booking
 
-    # START BOOKING
     if not booking["active"] and "book appointment" in user_input.lower():
         doctor = extract_doctor_name(user_input)
         day = extract_day(user_input)
@@ -190,17 +189,13 @@ if user_input:
         if not doctor:
             reply = "Please tell me the doctor's name."
         else:
-            booking["active"] = True
-            booking["doctor"] = doctor
-            booking["day"] = day
-            reply = f"📅 Booking appointment with **{doctor}**.\nPlease tell me your name."
+            booking.update({"active": True, "doctor": doctor, "day": day})
+            reply = f"📅 Booking appointment with {doctor}. Please tell me your name."
 
-    # PATIENT NAME
     elif booking["active"] and not booking["patient"]:
         booking["patient"] = user_input
         reply = "Please tell your preferred time (example: 10AM to 11AM)."
 
-    # TIME
     elif booking["active"] and not booking["time"]:
         try:
             start, end = user_input.upper().split("TO")
@@ -211,30 +206,12 @@ if user_input:
                 reply = "⛔ Appointments are only between 9AM and 6PM."
             else:
                 booking["time"] = user_input
-                result = book_appointment(
-                    booking["doctor"],
-                    booking["patient"],
-                    booking["day"] or datetime.now().strftime("%A"),
-                    booking["time"]
-                )
-                reply = f"✅ {result}"
-
-                # RESET
-                st.session_state.booking = {
-                    "active": False,
-                    "doctor": None,
-                    "day": None,
-                    "patient": None,
-                    "time": None
-                }
+                reply = f"✅ {book_appointment(booking['doctor'], booking['patient'], booking['day'], booking['time'])}"
+                st.session_state.booking = {"active": False, "doctor": None, "day": None, "patient": None, "time": None}
         except:
             reply = "❌ Invalid time format. Use: 10AM to 11AM"
 
-    # NORMAL CHAT
     else:
         reply = run_chatbot_query(user_input)
 
-    st.session_state.messages.append({
-        "role": "assistant",
-        "content": reply
-    })
+    st.session_state.messages.append({"role": "assistant", "content": reply})
