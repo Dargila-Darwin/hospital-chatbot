@@ -1,11 +1,11 @@
 import streamlit as st
+from datetime import datetime
 from chatbot import (
     run_chatbot_query,
     extract_doctor_name,
     extract_day,
     book_appointment
 )
-from datetime import datetime
 
 # ===============================
 # PAGE CONFIG
@@ -17,18 +17,14 @@ st.set_page_config(
 )
 
 # ===============================
-# FIXED TITLE (ALWAYS ON TOP)
+# TITLE (ALWAYS AT TOP)
 # ===============================
 st.markdown(
     """
-    <h1 style="
-        text-align:center;
-        color:#084298;
-        border-bottom:2px solid #ddd;
-        padding-bottom:10px;
-        margin-bottom:20px;">
+    <h1 style="text-align:center; color:#084298;">
         🏥 PRS Hospital – Chatbot Assistant
     </h1>
+    <hr>
     """,
     unsafe_allow_html=True
 )
@@ -38,38 +34,50 @@ st.markdown(
 # ===============================
 with st.sidebar.expander("ℹ️ About"):
     st.markdown("""
-    Our mission is to provide quality health care at competitive cost.  
-    **37+ years of excellence** with modern facilities in Trivandrum.
+    **PRS Hospital, Trivandrum**  
+    37+ years of excellence in healthcare with modern facilities.
     """)
 
-with st.sidebar.expander("🩺 Specialities"):
+with st.sidebar.expander("Specialities"):
     st.markdown("""
-    - Cardiologist  
-    - ENT  
-    - Gastroenterologist  
-    - Gynecologist  
-    - Neurologist  
-    - Orthopaedician  
-    - Dermatologist  
-    - Psychiatrist  
-    - Endocrinologist  
-    - Paediatrician  
-    """)
+        <ul>
+            <li>Cardiologist</li>
+            <li>ENT</li>
+            <li>Gastroenterologist</li>
+            <li>Gynecologist</li>
+            <li>Nephrologist</li>
+            <li>Neurologist</li>
+            <li>Urologist</li>
+            <li>Pulmonologist</li>
+            <li>Dermatologist</li>
+            <li>Ophthalmologist</li>
+            <li>Orthopaedician</li>
+            <li>Oncologist</li>
+            <li>Pathologist</li>
+            <li>Radiologist</li>
+            <li>Psychiatrist</li>
+            <li>Psychologist</li>
+            <li>Endocrinologist</li>
+            <li>General Surgeon</li>
+            <li>Paediatrician</li>
+        </ul>
+    """, unsafe_allow_html=True)
 
 with st.sidebar.expander("📞 Contact / Locate Us"):
     st.markdown("""
-    📍 Killipalam, Trivandrum  
-    🚑 **Emergency:** +91 9497 247 365
+    📍 **Killipalam, Trivandrum**  
+    🚑 **Emergency & Ambulance**  
+    **+91 9497 247 365**
     """)
 
 # ===============================
 # SESSION STATE
 # ===============================
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-if "booking_state" not in st.session_state:
-    st.session_state.booking_state = {
+if "booking" not in st.session_state:
+    st.session_state.booking = {
         "active": False,
         "doctor": None,
         "day": None,
@@ -77,25 +85,31 @@ if "booking_state" not in st.session_state:
         "time": None
     }
 
-if "last_input" not in st.session_state:
-    st.session_state.last_input = ""
+# ===============================
+# CHAT HISTORY (SCROLLS UP)
+# ===============================
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
 # ===============================
-# CHAT INPUT
+# INPUT (FIXED AT BOTTOM)
 # ===============================
-st.subheader("💬 Ask me anything")
-user_input = st.text_input("Type your message and press Enter")
+user_input = st.chat_input("Type your message here…")
 
 # ===============================
-# HANDLE USER INPUT (NO DUPLICATES)
+# CHAT + BOOKING LOGIC
 # ===============================
-if user_input and user_input != st.session_state.last_input:
-    st.session_state.last_input = user_input
-    st.session_state.chat_history.append(("You", user_input))
+if user_input:
+    # Show user message
+    st.session_state.messages.append({
+        "role": "user",
+        "content": user_input
+    })
 
-    booking = st.session_state.booking_state
+    booking = st.session_state.booking
 
-    # ---------- BOOKING START ----------
+    # ---------- BOOK APPOINTMENT ----------
     if not booking["active"] and "book" in user_input.lower():
         doctor = extract_doctor_name(user_input)
         day = extract_day(user_input)
@@ -133,7 +147,9 @@ if user_input and user_input != st.session_state.last_input:
                     booking["day"] or datetime.now().strftime("%A"),
                     booking["time"]
                 )
-                st.session_state.booking_state = {
+
+                # Reset booking
+                st.session_state.booking = {
                     "active": False,
                     "doctor": None,
                     "day": None,
@@ -147,25 +163,11 @@ if user_input and user_input != st.session_state.last_input:
     else:
         reply = run_chatbot_query(user_input)
 
-    st.session_state.chat_history.append(("Bot", reply))
+    # Show bot reply
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": reply
+    })
 
-# ===============================
-# CHAT HISTORY DISPLAY
-# ===============================
-st.markdown("---")
-for sender, message in st.session_state.chat_history:
-    if sender == "You":
-        st.markdown(f"**You:** {message}")
-    else:
-        st.markdown(
-            f"""
-            <div style="background:#f1f1f1;
-                        padding:10px;
-                        border-radius:10px;
-                        margin-bottom:10px;">
-                <strong>Bot:</strong><br>
-                {message.replace(chr(10), "<br>")}
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+    # Rerun to move chat upward
+    st.rerun()
