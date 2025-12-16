@@ -8,7 +8,7 @@ import gdown
 
 file_id = "1-eUWEBYaDUoAySlAHkoIyIsIllinlu5Z"
 url = f"https://drive.google.com/uc?id={file_id}"
-output = "model.safetensors"
+output = "bert_doctor_classification/model.safetensors"
 
 # Download if not already present
 gdown.download(url, output, quiet=False)
@@ -33,7 +33,7 @@ for col in ["Doctor Name", "Speciality", "Professional Degree", "Consultation Ti
 # ===============================
 model_path = "./bert_doctor_classification"
 tokenizer = BertTokenizer.from_pretrained(model_path)
-model = BertForSequenceClassification.from_pretrained(output)
+model = BertForSequenceClassification.from_pretrained(model_path)
 label_encoder = joblib.load(model_path + "/label_encoder.pkl")
 
 def detect_intent(user_query):
@@ -329,3 +329,4 @@ if __name__ == "__main__":
 # Streamlit helper
 def run_chatbot_query(query):
     return chatbot_response(query)
+
