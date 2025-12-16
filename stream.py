@@ -11,8 +11,7 @@ import base64
 # ===============================
 # Page config
 # ===============================
-st.set_page_config(page_title="PRS Hospital Chatbot", page_icon="🏥")
-st.title("🏥 PRS Hospital")
+st.set_page_config(page_title="PRS Hospital Chatbot", page_icon="🏥", layout="wide")
 
 # ===============================
 # Full background image
@@ -31,15 +30,37 @@ def set_full_background(image_path):
             background-repeat: no-repeat;
             background-attachment: fixed;
         }}
-
         .block-container {{
             background-color: rgba(255, 255, 255, 0.88);
-            padding: 2rem;
+            padding: 1.5rem;
             border-radius: 15px;
         }}
-
         section[data-testid="stSidebar"] {{
             background-color: rgba(255, 255, 255, 0.92);
+        }}
+        .chat-box {{
+            height: 60vh;
+            overflow-y: auto;
+            padding: 10px;
+        }}
+        .user-msg {{
+            background-color: rgba(0, 123, 255, 0.8);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 20px;
+            max-width: 60%;
+            margin-left: auto;
+            margin-bottom: 10px;
+            word-wrap: break-word;
+        }}
+        .bot-msg {{
+            background-color: rgba(220, 220, 220, 0.8);
+            color: black;
+            padding: 10px 15px;
+            border-radius: 20px;
+            max-width: 60%;
+            margin-bottom: 10px;
+            word-wrap: break-word;
         }}
         </style>
         """,
@@ -107,14 +128,30 @@ if "last_input" not in st.session_state:
     st.session_state.last_input = ""
 
 # ===============================
-# Chat input
+# Display Chat History in a scrollable box
 # ===============================
 st.subheader("💬 Hospital Chatbot Assistant")
-user_input = st.text_input("Type your message here:")
+st.markdown('<div class="chat-box">', unsafe_allow_html=True)
+
+for sender, message in st.session_state.chat_history:
+    if sender == "You":
+        st.markdown(
+            f'<div class="user-msg">{message}</div>',
+            unsafe_allow_html=True
+        )
+    else:
+        st.markdown(
+            f'<div class="bot-msg">{message.replace(chr(10), "<br>")}</div>',
+            unsafe_allow_html=True
+        )
+
+st.markdown('</div>', unsafe_allow_html=True)
 
 # ===============================
-# Handle user input
+# Chat input fixed at bottom
 # ===============================
+user_input = st.text_input("Type your message here:")
+
 if user_input and user_input != st.session_state.last_input:
     st.session_state.last_input = user_input
     st.session_state.chat_history.append(("You", user_input))
@@ -173,21 +210,3 @@ if st.session_state.booking_state["active"]:
                 st.session_state.booking_state = {"active": False, "doctor": None, "day": None}
         except:
             st.warning("⛔ Invalid time format. Use '10AM to 11AM'.")
-
-# ===============================
-# Display Chat History
-# ===============================
-st.markdown("---")
-for sender, message in st.session_state.chat_history:
-    if sender == "You":
-        st.markdown(f"**You:** {message}")
-    else:
-        st.markdown(
-            f"""
-            <div style="margin-bottom:10px;">
-                <strong>Bot:</strong><br>
-                {message.replace(chr(10), "<br>")}
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
