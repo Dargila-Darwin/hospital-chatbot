@@ -324,9 +324,11 @@ if __name__ == "__main__":
             print("Chatbot: Goodbye!")
             break
         response = chatbot_response(user_query)
-        print("Chatbot:", response)
+        print("Chatbot:")
+        print(response)
 
 # Streamlit helper
 def run_chatbot_query(query):
     return chatbot_response(query)
+
 
