@@ -6,12 +6,47 @@ from chatbot import (
     book_appointment
 )
 from datetime import datetime
+import base64
 
 # ===============================
 # Page config
 # ===============================
 st.set_page_config(page_title="PRS Hospital Chatbot", page_icon="🏥")
 st.title("🏥 PRS Hospital")
+
+# ===============================
+# Full background image
+# ===============================
+def set_full_background(image_path):
+    with open(image_path, "rb") as img:
+        encoded = base64.b64encode(img.read()).decode()
+
+    st.markdown(
+        f"""
+        <style>
+        .stApp {{
+            background-image: url("data:image/jpg;base64,{encoded}");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }}
+
+        .block-container {{
+            background-color: rgba(255, 255, 255, 0.88);
+            padding: 2rem;
+            border-radius: 15px;
+        }}
+
+        section[data-testid="stSidebar"] {{
+            background-color: rgba(255, 255, 255, 0.92);
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+set_full_background("hospital image.jpg")
 
 # ===============================
 # Sidebar
@@ -66,11 +101,7 @@ if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
 if "booking_state" not in st.session_state:
-    st.session_state.booking_state = {
-        "active": False,
-        "doctor": None,
-        "day": None
-    }
+    st.session_state.booking_state = {"active": False, "doctor": None, "day": None}
 
 if "last_input" not in st.session_state:
     st.session_state.last_input = ""
@@ -82,7 +113,7 @@ st.subheader("💬 Hospital Chatbot Assistant")
 user_input = st.text_input("Type your message here:")
 
 # ===============================
-# Handle user input (NO DUPLICATES)
+# Handle user input
 # ===============================
 if user_input and user_input != st.session_state.last_input:
     st.session_state.last_input = user_input
@@ -144,7 +175,7 @@ if st.session_state.booking_state["active"]:
             st.warning("⛔ Invalid time format. Use '10AM to 11AM'.")
 
 # ===============================
-# Display Chat History (LINE BY LINE FIX)
+# Display Chat History
 # ===============================
 st.markdown("---")
 for sender, message in st.session_state.chat_history:
