@@ -31,47 +31,43 @@ def set_background(image_path):
             background-image: url("data:image/jpg;base64,{encoded}");
             background-size: cover;
             background-position: center;
-            background-repeat: no-repeat;
             background-attachment: fixed;
         }}
-
-        .main-container {{
+        .main-box {{
             background-color: rgba(255,255,255,0.88);
             padding: 20px;
             border-radius: 20px;
+            max-width: 900px;
+            margin: auto;
         }}
-
         .chat-box {{
             height: 60vh;
             overflow-y: auto;
-            padding: 10px;
+            padding-bottom: 20px;
         }}
-
-        .user-msg {{
-            background-color: rgba(0,123,255,0.85);
+        .user {{
+            background: #0d6efd;
             color: white;
             padding: 10px 15px;
             border-radius: 20px;
-            max-width: 60%;
+            max-width: 65%;
             margin-left: auto;
             margin-bottom: 10px;
         }}
-
-        .bot-msg {{
-            background-color: rgba(240,240,240,0.9);
-            color: black;
+        .bot {{
+            background: #f1f3f5;
+            color: #000;
             padding: 10px 15px;
             border-radius: 20px;
-            max-width: 60%;
+            max-width: 65%;
             margin-bottom: 10px;
         }}
-
-        .hospital-header {{
+        .title {{
             text-align: center;
             font-size: 32px;
             font-weight: bold;
-            margin-bottom: 10px;
-            color: #0b5394;
+            color: #084298;
+            margin-bottom: 15px;
         }}
         </style>
         """,
@@ -81,23 +77,42 @@ def set_background(image_path):
 set_background("hospital image.jpg")
 
 # ===============================
-# Sidebar
+# Sidebar (ABOUT INCLUDED)
 # ===============================
 with st.sidebar:
     st.markdown("## 🏥 PRS Hospital")
-    st.markdown("📍 Killipalam, Trivandrum")
-    st.markdown("🚑 **Emergency:** +91 9497 247 365")
-    st.markdown("---")
-    st.markdown("### Specialities")
-    st.markdown("""
-    - Cardiologist  
-    - ENT  
-    - Gastroenterologist  
-    - Gynecologist  
-    - Neurologist  
-    - Orthopaedician  
-    - Paediatrician  
-    """)
+
+    with st.expander("ℹ️ About"):
+        st.markdown("""
+        **PRS Hospital**, Trivandrum  
+        37+ years of excellence in healthcare.  
+        300-bed multi-specialty hospital with modern facilities.
+        """)
+
+    with st.expander("🩺 Specialities"):
+        st.markdown("""
+        - Cardiologist  
+        - ENT  
+        - Gastroenterologist  
+        - Gynecologist  
+        - Nephrologist  
+        - Neurologist  
+        - Urologist  
+        - Pulmonologist  
+        - Dermatologist  
+        - Ophthalmologist  
+        - Orthopaedician  
+        - Oncologist  
+        - Psychiatrist  
+        - Endocrinologist  
+        - Paediatrician  
+        """)
+
+    with st.expander("📞 Contact"):
+        st.markdown("""
+        📍 Killipalam, Trivandrum  
+        🚑 Emergency: **+91 9497 247 365**
+        """)
 
 # ===============================
 # Session State
@@ -106,48 +121,47 @@ if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
 if "booking_state" not in st.session_state:
-    st.session_state.booking_state = {"active": False, "doctor": None, "day": None}
-
-if "last_input" not in st.session_state:
-    st.session_state.last_input = ""
-
-if "chat_input" not in st.session_state:
-    st.session_state.chat_input = ""
+    st.session_state.booking_state = {
+        "active": False,
+        "doctor": None,
+        "day": None
+    }
 
 # ===============================
-# MAIN CONTAINER
+# Main UI
 # ===============================
-st.markdown('<div class="main-container">', unsafe_allow_html=True)
+st.markdown('<div class="main-box">', unsafe_allow_html=True)
 
-# ✅ HOSPITAL NAME (ALWAYS VISIBLE)
-st.markdown('<div class="hospital-header">PRS Hospital – Chatbot Assistant</div>', unsafe_allow_html=True)
+# Hospital name always visible
+st.markdown(
+    '<div class="title">PRS Hospital – Chatbot Assistant</div>',
+    unsafe_allow_html=True
+)
 
 # ===============================
-# CHAT DISPLAY
+# Chat History
 # ===============================
 st.markdown('<div class="chat-box">', unsafe_allow_html=True)
 
 for sender, message in st.session_state.chat_history:
     if sender == "You":
-        st.markdown(f'<div class="user-msg">{message}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="user">{message}</div>', unsafe_allow_html=True)
     else:
         st.markdown(
-            f'<div class="bot-msg">{message.replace(chr(10), "<br>")}</div>',
+            f'<div class="bot">{message.replace(chr(10), "<br>")}</div>',
             unsafe_allow_html=True
         )
 
 st.markdown('</div>', unsafe_allow_html=True)
 
 # ===============================
-# CHAT INPUT (AUTO CLEAR)
+# Chat Input (BOTTOM + AUTO CLEAR)
 # ===============================
-user_input = st.text_input(
-    "Type your message here 👇",
-    key="chat_input"
-)
+with st.form(key="chat_form", clear_on_submit=True):
+    user_input = st.text_input("Type your message here 👇")
+    send = st.form_submit_button("Send")
 
-if user_input and user_input != st.session_state.last_input:
-    st.session_state.last_input = user_input
+if send and user_input:
     st.session_state.chat_history.append(("You", user_input))
 
     if "book appointment" in user_input.lower():
@@ -165,17 +179,14 @@ if user_input and user_input != st.session_state.last_input:
             )
         else:
             st.session_state.chat_history.append(
-                ("Bot", "Please specify a doctor name to book an appointment.")
+                ("Bot", "Please specify a valid doctor name.")
             )
     else:
         response = run_chatbot_query(user_input)
         st.session_state.chat_history.append(("Bot", response))
 
-    # ✅ CLEAR INPUT BOX
-    st.session_state.chat_input = ""
-
 # ===============================
-# BOOKING FORM
+# Booking Section
 # ===============================
 if st.session_state.booking_state["active"]:
     st.markdown("---")
