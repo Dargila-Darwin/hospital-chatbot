@@ -1,3 +1,4 @@
+# app.py
 import streamlit as st
 import pandas as pd
 from datetime import datetime, date, time
@@ -52,7 +53,8 @@ with st.sidebar.expander("📍 Location"):
     """)
 
 st.sidebar.subheader("📅 Appointment Booking")
-for num in ["+91 9876543210", "+91 9678547645"]:
+HOSPITAL_CONTACTS = ["+91 9876543210", "+91 9678547645"]
+for num in HOSPITAL_CONTACTS:
     st.sidebar.markdown(f"📞 {num}")
     st.sidebar.markdown(f"[Call {num}](tel:{num.replace(' ', '')})")
 
@@ -86,13 +88,10 @@ if not pd.io.common.file_exists(APPT_FILE):
 def save_appointment(doc, patient, d, t):
     df = pd.read_csv(APPT_FILE)
     slots = df[(df["Doctor"] == doc) & (df["Date"] == str(d)) & (df["Time"] == t)]
-
     if len(slots) >= MAX_SLOTS_PER_DOCTOR:
         return f"⛔ Slot full for **{doc}** on **{d} {t}**."
-
     df.loc[len(df)] = [doc, patient, str(d), t]
     df.to_csv(APPT_FILE, index=False)
-
     return (
         f"✅ Appointment confirmed\n\n"
         f"👨‍⚕️ Doctor: **{doc}**\n"
@@ -123,9 +122,9 @@ for msg in st.session_state.messages:
         """, unsafe_allow_html=True)
 
 # ===============================
-# INPUT
+# USER INPUT
 # ===============================
-user_input = st.chat_input("Ask about doctors or book appointment")
+user_input = st.chat_input("Ask about doctors, speciality, degree, location, or book appointment")
 
 if user_input:
     st.session_state.messages.append({"role": "user", "content": user_input})
@@ -137,7 +136,7 @@ if user_input:
     if "book" in user_input.lower() and booking["step"] is None:
         doctor = extract_doctor_name(user_input)
         if not doctor:
-            reply = "Please mention doctor name."
+            reply = "Please mention doctor name for booking."
         else:
             booking["doctor"] = doctor
             booking["step"] = "patient"
@@ -167,23 +166,16 @@ if user_input:
 booking = st.session_state.booking
 
 if booking["step"] == "date":
-    d = st.date_input(
-        "Select date",
-        min_value=date.today()
-    )
+    d = st.date_input("Select date", min_value=date.today())
     if st.button("Confirm Date"):
         booking["date"] = d
         booking["step"] = "time"
         st.rerun()
 
 if booking["step"] == "time":
-    t = st.time_input(
-        "Select time",
-        value=time(9, 0)
-    )
-
-    now = datetime.now()
+    t = st.time_input("Select time", value=time(9, 0))
     selected_dt = datetime.combine(booking["date"], t)
+    now = datetime.now()
 
     if st.button("Confirm Time"):
         if selected_dt < now:
@@ -197,12 +189,7 @@ if booking["step"] == "time":
                 booking["date"],
                 t.strftime("%I:%M%p").lower()
             )
-
-            st.session_state.messages.append({
-                "role": "assistant",
-                "content": result
-            })
-
+            st.session_state.messages.append({"role": "assistant", "content": result})
             st.session_state.booking = {
                 "step": None,
                 "doctor": None,
