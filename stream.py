@@ -2,7 +2,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, date, time
-from chatbot import run_chatbot_query, extract_doctor_name
+from chatbot import run_chatbot_query, extract_doctor_name, df, is_doctor_available, book_appointment
 
 # ===============================
 # PAGE CONFIG
@@ -40,9 +40,22 @@ with st.sidebar.expander("🩺 Specialities"):
     - ENT  
     - Gastroenterologist  
     - Gynecologist  
+    - Nephrologist  
     - Neurologist  
+    - Urologist  
+    - Pulmonologist  
+    - Dermatologist  
+    - Ophthalmologist  
     - Orthopaedician  
+    - Oncologist  
+    - Pathologist  
+    - Radiologist  
+    - Psychiatrist  
+    - Psychologist  
+    - Endocrinologist  
+    - General Surgeon  
     - Paediatrician  
+
     """)
 
 with st.sidebar.expander("📍 Location"):
@@ -75,30 +88,6 @@ if "booking" not in st.session_state:
         "date": None,
         "time": None
     }
-
-# ===============================
-# APPOINTMENT STORAGE
-# ===============================
-APPT_FILE = "appointments.csv"
-MAX_SLOTS_PER_DOCTOR = 5
-
-if not pd.io.common.file_exists(APPT_FILE):
-    pd.DataFrame(columns=["Doctor", "Patient", "Date", "Time"]).to_csv(APPT_FILE, index=False)
-
-def save_appointment(doc, patient, d, t):
-    df = pd.read_csv(APPT_FILE)
-    slots = df[(df["Doctor"] == doc) & (df["Date"] == str(d)) & (df["Time"] == t)]
-    if len(slots) >= MAX_SLOTS_PER_DOCTOR:
-        return f"⛔ Slot full for **{doc}** on **{d} {t}**."
-    df.loc[len(df)] = [doc, patient, str(d), t]
-    df.to_csv(APPT_FILE, index=False)
-    return (
-        f"✅ Appointment confirmed\n\n"
-        f"👨‍⚕️ Doctor: **{doc}**\n"
-        f"👤 Patient: **{patient}**\n"
-        f"📅 Date: **{d}**\n"
-        f"⏰ Time: **{t}**"
-    )
 
 # ===============================
 # CHAT DISPLAY
@@ -147,10 +136,7 @@ if user_input:
         booking["step"] = "date"
         reply = "📆 Select appointment date from calendar below."
 
-    elif booking["step"] == "date":
-        pass  # handled below
-
-    elif booking["step"] == "time":
+    elif booking["step"] in ["date", "time"]:
         pass  # handled below
 
     else:
@@ -166,35 +152,34 @@ if user_input:
 booking = st.session_state.booking
 
 if booking["step"] == "date":
-    d = st.date_input("Select date", min_value=date.today())
+    d = st.date_input("Select appointment date", min_value=date.today())
     if st.button("Confirm Date"):
         booking["date"] = d
         booking["step"] = "time"
         st.rerun()
 
 if booking["step"] == "time":
-    t = st.time_input("Select time", value=time(9, 0))
-    selected_dt = datetime.combine(booking["date"], t)
-    now = datetime.now()
+    selected_doctor = df[df["Doctor Name"] == booking["doctor"]].iloc[0]
+    consult_start, consult_end = selected_doctor["Consultation Time"].split("to")
+    consult_start = datetime.strptime(consult_start.strip(), "%I%p").time()
+    consult_end = datetime.strptime(consult_end.strip(), "%I%p").time()
+
+    t = st.time_input(
+        f"Select appointment time (available: {consult_start.strftime('%I:%M%p')} to {consult_end.strftime('%I:%M%p')})",
+        value=consult_start
+    )
 
     if st.button("Confirm Time"):
-        if selected_dt < now:
-            st.error("⛔ Cannot book past time.")
-        elif t < time(9, 0) or t > time(20, 0):
-            st.error("⛔ Allowed only between 9am and 8pm.")
-        else:
-            result = save_appointment(
-                booking["doctor"],
-                booking["patient"],
-                booking["date"],
-                t.strftime("%I:%M%p").lower()
-            )
-            st.session_state.messages.append({"role": "assistant", "content": result})
-            st.session_state.booking = {
-                "step": None,
-                "doctor": None,
-                "patient": None,
-                "date": None,
-                "time": None
-            }
-            st.rerun()
+        # Check availability
+        appointment_result = book_appointment(selected_doctor, booking["patient"], booking["date"], t)
+        st.session_state.messages.append({"role": "assistant", "content": appointment_result})
+
+        # Reset booking
+        st.session_state.booking = {
+            "step": None,
+            "doctor": None,
+            "patient": None,
+            "date": None,
+            "time": None
+        }
+        st.rerun()
