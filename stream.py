@@ -41,53 +41,45 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ===============================
-# SIDEBAR
+# SIDEBAR WITH EXPANDERS
 # ===============================
 with st.sidebar:
     st.title("🏥 PRS Hospital")
 
-    st.markdown("### ℹ️ About")
-    st.write(
-        "PRS Hospital, Thiruvananthapuram, has over 37 years of excellence "
-        "in multi-specialty healthcare and advanced medical services."
-    )
+    # About
+    with st.expander("ℹ️ About"):
+        st.write(
+            "PRS Hospital, Thiruvananthapuram, has over 37 years of excellence "
+            "in multi-specialty healthcare and advanced medical services."
+        )
 
-    st.markdown("### 🩺 Specialities")
-    st.markdown("""
-   - Cardiologist  
-    - ENT  
-    - Gastroenterologist  
-    - Gynecologist  
-    - Nephrologist  
-    - Neurologist  
-    - Urologist  
-    - Pulmonologist  
-    - Dermatologist  
-    - Ophthalmologist  
-    - Orthopaedician  
-    - Oncologist  
-    - Pathologist  
-    - Radiologist  
-    - Psychiatrist  
-    - Psychologist  
-    - Endocrinologist  
-    - General Surgeon  
-    - Paediatrician  
-  
-    """)
+    # Specialities
+    with st.expander("🩺 Specialities"):
+        specialities = [
+            "Cardiologist", "ENT", "Gastroenterologist", "Gynecologist",
+            "Nephrologist", "Neurologist", "Urologist", "Pulmonologist",
+            "Dermatologist", "Ophthalmologist", "Orthopaedician", "Oncologist",
+            "Pathologist", "Radiologist", "Psychiatrist", "Psychologist",
+            "Endocrinologist", "General Surgeon", "Paediatrician"
+        ]
+        for spec in specialities:
+            st.markdown(f"- {spec}")
 
-    st.markdown("### 📍 Location")
-    st.markdown("""
-    **PRS Hospital**  
-    Killipalam,  
-    Thiruvananthapuram, Kerala – 695002
-    """)
+    # Location
+    with st.expander("📍 Location"):
+        st.markdown("""
+        **PRS Hospital**  
+        Killipalam,  
+        Thiruvananthapuram, Kerala – 695002
+        """)
 
+    # Appointment Booking
     st.markdown("### 📞 Appointment Booking")
     st.markdown("📞 +91 98765 43210")
     st.markdown("📞 +91 96785 47645")
     st.markdown("[📲 Call Hospital](tel:+919876543210)")
 
+    # Emergency
     st.markdown("### ☎️ Emergency")
     st.markdown("🚨 **+91 95687 46574**")
 
@@ -114,12 +106,12 @@ MAX_SLOTS_PER_DOCTOR = 5
 
 if not pd.io.common.file_exists(APPT_FILE):
     pd.DataFrame(
-        columns=["Doctor", "Patient", "Date", "Time"]
+        columns=["Doctor Name", "Patient Name", "Day", "Time"]
     ).to_csv(APPT_FILE, index=False)
 
 def save_appointment(doc, patient, d, t):
     df = pd.read_csv(APPT_FILE)
-    slots = df[(df["Doctor"] == doc) & (df["Date"] == str(d))]
+    slots = df[(df["Doctor Name"] == doc) & (df["Day"] == str(d))]
 
     if len(slots) >= MAX_SLOTS_PER_DOCTOR:
         return f"⛔ Slot full for **{doc}** on **{d}**."
@@ -157,13 +149,12 @@ if user_input:
     booking = st.session_state.booking
     reply = None
 
-    # ---------- BOOKING FLOW LOCK ----------
+    # ---------- BOOKING FLOW ----------
     if booking["step"] is not None:
         if booking["step"] == "patient":
             booking["patient"] = user_input.strip()
             booking["step"] = "date"
             reply = "📆 Please select appointment date below."
-
         else:
             reply = "⚠️ Please complete the appointment booking steps below."
 
@@ -177,7 +168,17 @@ if user_input:
             reply = f"📅 Booking appointment with **{doctor}**.\nPlease enter patient name."
 
     else:
-        reply = run_chatbot_query(user_input)
+        # Run chatbot query
+        response = run_chatbot_query(user_input)
+
+        # If the response includes multiple doctors, split line by line
+        if "\n" in response:
+            response_lines = response.split("\n")
+            reply = ""
+            for line in response_lines:
+                reply += f"{line}\n"
+        else:
+            reply = response
 
     st.session_state.messages.append(
         {"role": "assistant", "content": reply}
@@ -222,6 +223,7 @@ if booking["step"] == "time":
             st.session_state.messages.append(
                 {"role": "assistant", "content": result}
             )
+            # Reset booking
             st.session_state.booking = {
                 "step": None,
                 "doctor": None,
