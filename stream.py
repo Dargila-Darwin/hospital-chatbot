@@ -94,8 +94,30 @@ if "booking" not in st.session_state:
 # CHAT HISTORY
 # ===============================
 for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+    if msg["role"] == "user":
+        with st.chat_message("user"):
+            st.markdown(f'''
+                <div style="
+                    text-align: right;
+                    background-color: #DCF8C6;
+                    padding: 10px;
+                    border-radius: 10px;
+                    margin: 5px;
+                    display: inline-block;
+                ">{msg["content"]}</div>
+            ''', unsafe_allow_html=True)
+    else:
+        with st.chat_message("assistant"):
+            st.markdown(f'''
+                <div style="
+                    text-align: left;
+                    background-color: #F1F0F0;
+                    padding: 10px;
+                    border-radius: 10px;
+                    margin: 5px;
+                    display: inline-block;
+                ">{msg["content"]}</div>
+            ''', unsafe_allow_html=True)
 
 # ===============================
 # INPUT
@@ -176,3 +198,4 @@ if user_input:
     })
 
     st.rerun()
+
