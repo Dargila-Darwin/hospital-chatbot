@@ -1,16 +1,16 @@
 # ===============================
-# PRS HOSPITAL CHATBOT (FINAL)
+# PRS HOSPITAL CHATBOT (FINAL – CORRECT)
 # BERT LOGIC UNTOUCHED ✅
 # ===============================
 
 import re
+import os
 import pandas as pd
 import torch
 import joblib
-from datetime import datetime, time
+from datetime import datetime, timedelta
 from transformers import BertTokenizer, BertForSequenceClassification
 import gdown
-import os
 
 # ===============================
 # MODEL DOWNLOAD
@@ -46,7 +46,7 @@ model = BertForSequenceClassification.from_pretrained(model_path)
 label_encoder = joblib.load(os.path.join(model_path, "label_encoder.pkl"))
 
 def detect_intent(query):
-    inputs = tokenizer(query, return_tensors="pt")
+    inputs = tokenizer(query, return_tensors="pt", truncation=True, padding=True)
     outputs = model(**inputs)
     pred = torch.argmax(outputs.logits).item()
     return label_encoder.inverse_transform([pred])[0]
@@ -55,117 +55,135 @@ def detect_intent(query):
 # CONSTANTS
 # ===============================
 SPECIALITY_SYNONYMS = {
-    "cardiologist": ["heart", "cardio", "cardiology"],
-    "ent": ["ear nose throat"],
-    "neurologist": ["brain", "neuro"],
+    "cardiologist": ["cardio", "heart", "cardiology", "interventional cardiologist", "chief cardiologist", "caardio"],
+    "ent": ["ear nose throat", "otolaryngology", "laryngology", "phonosurgery", "vertigo"],
+    "gastroenterologist": ["gastro", "digestive", "hepatology", "pediatric gastroenterology"],
+    "gynecologist": ["gyn", "obg", "obstetrics", "fertility"],
+    "nephrologist": ["kidney"],
+    "neurologist": ["neuro", "brain", "neurovascular", "stroke"],
+    "urologist": ["urinary", "genito-urinary"],
+    "pulmonologist": ["respiratory", "lungs", "tb"],
+    "dermatologist": ["skin"],
+    "ophthalmologist": ["eye"],
+    "orthopaedician": ["ortho", "orthopedic", "arthroscopy"],
+    "oncologist": ["cancer", "medical oncology", "surgical oncology", "clinical oncology"],
+    "pathologist": ["pathology"],
+    "radiologist": ["radiology", "radiodiagnosis", "interventional radiology"],
+    "psychiatrist": ["mental health", "psych","Psychiatrist"],
+    "psychologist": ["counseling"],
+    "endocrinologist": ["endocrine", "hormone"],
+    "general surgeon": ["gen surg", "surgery"],
+    "paediatrician": ["kids doctor", "paed", "pediatrician", "child doctor"],
+
 }
 
 DAY_SYNONYMS = {
-    "monday": ["mon"], "tuesday": ["tue"], "wednesday": ["wed"],
-    "thursday": ["thu"], "friday": ["fri"],
-    "saturday": ["sat"], "sunday": ["sun"]
+    "monday": ["mon"], "tuesday": ["tue"],
+    "wednesday": ["wed"], "thursday": ["thu"],
+    "friday": ["fri"], "saturday": ["sat"],
+    "sunday": ["sun"]
 }
 
 COLUMN_ALIASES = {
     "Professional Degree": ["degree", "qualification"],
-    "Contact": ["contact", "phone"],
+    "Contact": ["contact", "phone", "mobile"],
     "Location": ["location", "address"],
-    "Consultation Time": ["timing", "time"],
+    "Consultation Time": ["timing", "time", "hours"],
 }
 
 # ===============================
 # EXTRACTION HELPERS
 # ===============================
 def extract_doctor_name(text):
-    text = text.lower()
+    t = text.lower()
     for name in df["Doctor Name"].unique():
-        if name.lower() in text:
+        if name.lower() in t:
             return name
     return None
 
 def extract_day(text):
-    text = text.lower()
-    if "today" in text:
+    t = text.lower()
+    if "today" in t:
         return datetime.now().strftime("%A").lower()
-    if "tomorrow" in text:
-        return (datetime.now().replace(day=datetime.now().day + 1)).strftime("%A").lower()
-    for d, syn in DAY_SYNONYMS.items():
-        if d in text or any(s in text for s in syn):
+    if "tomorrow" in t:
+        return (datetime.now() + timedelta(days=1)).strftime("%A").lower()
+    for d, syns in DAY_SYNONYMS.items():
+        if d in t or any(s in t for s in syns):
             return d
     return None
 
 def match_specialty(text):
-    text = text.lower()
+    t = text.lower()
     for spec in df["Speciality"].unique():
-        if spec.lower() in text:
+        if spec.lower() in t:
             return spec
     for k, v in SPECIALITY_SYNONYMS.items():
-        if k in text or any(s in text for s in v):
+        if k in t or any(s in t for s in v):
             return k
     return None
 
 def map_field(text):
-    text = text.lower()
+    t = text.lower()
     for col, aliases in COLUMN_ALIASES.items():
-        if any(a in text for a in aliases):
+        if any(a in t for a in aliases):
             return col
     return None
 
 # ===============================
-# AVAILABILITY CHECK
+# AVAILABILITY LOGIC (CORRECT)
 # ===============================
 def is_available_on(day, available_text):
     if not day:
         return True
-    available_text = available_text.lower()
-    if "all days" in available_text:
+    txt = available_text.lower()
+    if "all days" in txt:
         return True
-    if "not available" in available_text:
-        return day not in available_text
+    if "not available" in txt:
+        return day not in txt
     return True
 
 # ===============================
-# TIME PARSING
+# TIME PARSING (ROBUST)
 # ===============================
 def parse_time(t):
-    return datetime.strptime(t.strip(), "%I%p").time()
+    t = t.replace(".", ":").strip().upper()
+    try:
+        return datetime.strptime(t, "%I:%M%p").time()
+    except:
+        return datetime.strptime(t, "%I%p").time()
 
 def is_time_within_slot(consult_time, booking_time):
+    consult_time = consult_time.replace("–", "-")
     start, end = consult_time.split("-")
-    start_t = parse_time(start.replace(" ", ""))
-    end_t = parse_time(end.replace(" ", ""))
-    return start_t <= booking_time <= end_t
+    return parse_time(start) <= booking_time <= parse_time(end)
 
 # ===============================
-# APPOINTMENT BOOKING (VALIDATED)
+# APPOINTMENT BOOKING
 # ===============================
 appointments_file = "appointments.csv"
-
 if not os.path.exists(appointments_file):
-    pd.DataFrame(columns=["Doctor", "Patient", "Day", "Time"]).to_csv(appointments_file, index=False)
+    pd.DataFrame(
+        columns=["Doctor", "Patient", "Day", "Time"]
+    ).to_csv(appointments_file, index=False)
 
 def book_appointment(doctor, patient, day, time_str):
     row = df[df["Doctor Name"].str.contains(re.escape(doctor), case=False)]
-
     if row.empty:
         return "❌ Doctor not found."
 
     row = row.iloc[0]
 
-    # Day validation
     if not is_available_on(day, row["Available days"]):
-        return f"❌ {doctor} is NOT available on {day.capitalize()}."
+        return f"❌ {doctor} is not available on {day.capitalize()}."
 
-    # Time validation
     try:
-        booking_time = datetime.strptime(time_str.lower(), "%I%p").time()
+        booking_time = parse_time(time_str)
     except:
-        return "❌ Invalid time format. Use 10AM, 3PM, etc."
+        return "❌ Invalid time format (use 10AM, 3PM)."
 
     if not is_time_within_slot(row["Consultation Time"], booking_time):
-        return f"❌ Booking time outside consultation hours ({row['Consultation Time']})."
+        return f"❌ Outside consultation hours ({row['Consultation Time']})."
 
-    # Save appointment
     appt_df = pd.read_csv(appointments_file)
     appt_df.loc[len(appt_df)] = [doctor, patient, day.capitalize(), time_str.upper()]
     appt_df.to_csv(appointments_file, index=False)
@@ -176,17 +194,17 @@ def book_appointment(doctor, patient, day, time_str):
 # RESPONSE BUILDERS
 # ===============================
 def availability_on_day_for_specialty(spec, day):
-    rows = df[df["Speciality"].str.contains(spec, case=False)]
+    rows = df[df["Speciality"].str.lower().str.contains(spec.lower(), na=False)]
     result = []
     for _, r in rows.iterrows():
         if is_available_on(day, r["Available days"]):
             result.append(
-                f"👨‍⚕️ {r['Doctor Name']} ({r['Speciality']}) - {r['Consultation Time']}"
+                f"👨‍⚕️ {r['Doctor Name']} ({r['Speciality']}) – {r['Consultation Time']}"
             )
     return "\n".join(result) if result else f"⚠️ No {spec} available on {day.capitalize()}."
 
 # ===============================
-# MAIN CHATBOT
+# MAIN CHATBOT LOGIC
 # ===============================
 def chatbot_response(query):
     intent = detect_intent(query)
@@ -201,15 +219,24 @@ def chatbot_response(query):
 
     if doctor and field:
         row = df[df["Doctor Name"] == doctor].iloc[0]
+        if field == "Contact":
+            return f"📞 {row['Contact']}\n📧 {row['Email']}"
         return f"{doctor} {field.lower()}: {row[field]}"
 
     if day and specialty:
         return availability_on_day_for_specialty(specialty, day)
 
     if intent == "find_doctor" and specialty:
-        return availability_on_day_for_specialty(specialty, datetime.now().strftime("%A").lower())
+        today = datetime.now().strftime("%A").lower()
+        return availability_on_day_for_specialty(specialty, today)
 
-    return "🤖 I can help with doctors, availability, booking, degree, contact, and hospital location."
+    return (
+        "🤖 I can help with:\n"
+        "• Doctor availability (today / tomorrow / specific day)\n"
+        "• Doctor details & qualifications\n"
+        "• Appointment booking\n"
+        "• Contact & hospital location"
+    )
 
 # ===============================
 # STREAMLIT ENTRY
