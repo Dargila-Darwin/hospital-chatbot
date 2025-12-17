@@ -1,11 +1,7 @@
 import streamlit as st
-from datetime import datetime
-from chatbot import (
-    run_chatbot_query,
-    extract_doctor_name,
-    extract_day,
-    book_appointment
-)
+import pandas as pd
+from datetime import datetime, date, time
+from chatbot import run_chatbot_query, extract_doctor_name
 
 # ===============================
 # PAGE CONFIG
@@ -34,7 +30,7 @@ st.sidebar.title("🏥 Hospital Dashboard")
 with st.sidebar.expander("ℹ️ About"):
     st.markdown("""
     **PRS Hospital, Trivandrum**  
-    37+ years of excellence in healthcare with modern facilities.
+    37+ years of excellence in healthcare.
     """)
 
 with st.sidebar.expander("🩺 Specialities"):
@@ -43,50 +39,25 @@ with st.sidebar.expander("🩺 Specialities"):
     - ENT  
     - Gastroenterologist  
     - Gynecologist  
-    - Nephrologist  
     - Neurologist  
-    - Urologist  
-    - Pulmonologist  
-    - Dermatologist  
-    - Ophthalmologist  
     - Orthopaedician  
-    - Oncologist  
-    - Pathologist  
-    - Radiologist  
-    - Psychiatrist  
-    - Psychologist  
-    - Endocrinologist  
-    - General Surgeon  
     - Paediatrician  
     """)
 
 with st.sidebar.expander("📍 Location"):
     st.markdown("""
     **PRS Hospital**  
-    Killipalam  
-    Thiruvananthapuram  
-    Kerala – 695002
+    Killipalam,  
+    Thiruvananthapuram, Kerala – 695002
     """)
 
-# Appointment Booking (clickable)
 st.sidebar.subheader("📅 Appointment Booking")
-appointment_numbers = [
-    "+91 9876543210",
-    "+91 9678547645",
-    "+91 9234765840"
-]
-for num in appointment_numbers:
-    st.sidebar.markdown(f"[📞 {num}](tel:{num.replace(' ', '')})")
+for num in ["+91 9876543210", "+91 9678547645"]:
+    st.sidebar.markdown(f"📞 {num}")
+    st.sidebar.markdown(f"[Call {num}](tel:{num.replace(' ', '')})")
 
-# Emergency (non-clickable)
-st.sidebar.subheader("🚨 Emergency Numbers")
-for num in ["+91 9678768843", "+91 9568746574"]:
-    st.sidebar.markdown(f"⚠️ **{num}**")
-
-# General Contact (non-clickable)
-st.sidebar.subheader("📞 General Contact")
-for num in ["+91 9448123456", "+91 9448234567"]:
-    st.sidebar.markdown(f"📱 {num}")
+st.sidebar.subheader("🚨 Emergency")
+st.sidebar.markdown("⚠️ **+91 9568746574**")
 
 # ===============================
 # SESSION STATE
@@ -96,101 +67,147 @@ if "messages" not in st.session_state:
 
 if "booking" not in st.session_state:
     st.session_state.booking = {
-        "active": False,
+        "step": None,
         "doctor": None,
-        "day": None,
         "patient": None,
+        "date": None,
         "time": None
     }
 
 # ===============================
-# CHAT HISTORY
+# APPOINTMENT STORAGE
+# ===============================
+APPT_FILE = "appointments.csv"
+MAX_SLOTS_PER_DOCTOR = 5
+
+if not pd.io.common.file_exists(APPT_FILE):
+    pd.DataFrame(columns=["Doctor", "Patient", "Date", "Time"]).to_csv(APPT_FILE, index=False)
+
+def save_appointment(doc, patient, d, t):
+    df = pd.read_csv(APPT_FILE)
+    slots = df[(df["Doctor"] == doc) & (df["Date"] == str(d)) & (df["Time"] == t)]
+
+    if len(slots) >= MAX_SLOTS_PER_DOCTOR:
+        return f"⛔ Slot full for **{doc}** on **{d} {t}**."
+
+    df.loc[len(df)] = [doc, patient, str(d), t]
+    df.to_csv(APPT_FILE, index=False)
+
+    return (
+        f"✅ Appointment confirmed\n\n"
+        f"👨‍⚕️ Doctor: **{doc}**\n"
+        f"👤 Patient: **{patient}**\n"
+        f"📅 Date: **{d}**\n"
+        f"⏰ Time: **{t}**"
+    )
+
+# ===============================
+# CHAT DISPLAY
 # ===============================
 for msg in st.session_state.messages:
     align = "right" if msg["role"] == "user" else "left"
-    bg = "#DCF8C6" if msg["role"] == "user" else "#F1F0F0"
+    color = "#DCF8C6" if msg["role"] == "user" else "#F1F0F0"
 
     with st.chat_message(msg["role"]):
         st.markdown(f"""
         <div style="
             text-align:{align};
-            background-color:{bg};
+            background:{color};
             padding:10px;
             border-radius:10px;
-            margin:5px;
             display:inline-block;
-            white-space:pre-line;">
-            {msg["content"]}
+            white-space:pre-line;
+        ">
+        {msg["content"]}
         </div>
         """, unsafe_allow_html=True)
 
 # ===============================
 # INPUT
 # ===============================
-user_input = st.chat_input(
-    "Ask about doctors, timings, availability, or book an appointment…"
-)
+user_input = st.chat_input("Ask about doctors or book appointment")
 
-# ===============================
-# CHAT + BOOKING LOGIC
-# ===============================
 if user_input:
-    st.session_state.messages.append({
-        "role": "user",
-        "content": user_input
-    })
+    st.session_state.messages.append({"role": "user", "content": user_input})
 
     booking = st.session_state.booking
+    reply = ""
 
-    if not booking["active"] and "book" in user_input.lower():
+    # ---------------- BOOKING FLOW ----------------
+    if "book" in user_input.lower() and booking["step"] is None:
         doctor = extract_doctor_name(user_input)
-        day = extract_day(user_input)
-
         if not doctor:
-            reply = "👨‍⚕️ Please specify the doctor's name."
+            reply = "Please mention doctor name."
         else:
-            booking.update({
-                "active": True,
-                "doctor": doctor,
-                "day": day
-            })
+            booking["doctor"] = doctor
+            booking["step"] = "patient"
             reply = f"📅 Booking appointment with **{doctor}**.\nPlease enter patient name."
 
-    elif booking["active"] and not booking["patient"]:
+    elif booking["step"] == "patient":
         booking["patient"] = user_input.strip()
-        reply = "⏰ Enter preferred time (example: **10am to 11am**)"
+        booking["step"] = "date"
+        reply = "📆 Select appointment date from calendar below."
 
-    elif booking["active"] and not booking["time"]:
-        try:
-            start, end = user_input.lower().split("to")
-            start_t = datetime.strptime(start.strip(), "%I%p")
-            end_t = datetime.strptime(end.strip(), "%I%p")
+    elif booking["step"] == "date":
+        pass  # handled below
 
-            if start_t < datetime.strptime("9am", "%I%p") or end_t > datetime.strptime("8pm", "%I%p"):
-                reply = "⛔ Appointments allowed only between **9am and 8pm**."
-            else:
-                reply = book_appointment(
-                    booking["doctor"],
-                    booking["patient"],
-                    booking["day"] or datetime.now().strftime("%A"),
-                    user_input.lower()
-                )
-                st.session_state.booking = {
-                    "active": False,
-                    "doctor": None,
-                    "day": None,
-                    "patient": None,
-                    "time": None
-                }
-        except:
-            reply = "❌ Invalid format. Use **10am to 11am**."
+    elif booking["step"] == "time":
+        pass  # handled below
 
     else:
         reply = run_chatbot_query(user_input)
 
-    st.session_state.messages.append({
-        "role": "assistant",
-        "content": reply
-    })
+    if reply:
+        st.session_state.messages.append({"role": "assistant", "content": reply})
+        st.rerun()
 
-    st.rerun()
+# ===============================
+# CALENDAR + TIME UI
+# ===============================
+booking = st.session_state.booking
+
+if booking["step"] == "date":
+    d = st.date_input(
+        "Select date",
+        min_value=date.today()
+    )
+    if st.button("Confirm Date"):
+        booking["date"] = d
+        booking["step"] = "time"
+        st.rerun()
+
+if booking["step"] == "time":
+    t = st.time_input(
+        "Select time",
+        value=time(9, 0)
+    )
+
+    now = datetime.now()
+    selected_dt = datetime.combine(booking["date"], t)
+
+    if st.button("Confirm Time"):
+        if selected_dt < now:
+            st.error("⛔ Cannot book past time.")
+        elif t < time(9, 0) or t > time(20, 0):
+            st.error("⛔ Allowed only between 9am and 8pm.")
+        else:
+            result = save_appointment(
+                booking["doctor"],
+                booking["patient"],
+                booking["date"],
+                t.strftime("%I:%M%p").lower()
+            )
+
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": result
+            })
+
+            st.session_state.booking = {
+                "step": None,
+                "doctor": None,
+                "patient": None,
+                "date": None,
+                "time": None
+            }
+            st.rerun()
