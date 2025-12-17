@@ -32,6 +32,8 @@ st.markdown(
 # ===============================
 # SIDEBAR
 # ===============================
+st.sidebar.title("🏥 Hospital Dashboard")
+
 with st.sidebar.expander("ℹ️ About"):
     st.markdown("""
     **PRS Hospital, Trivandrum**  
@@ -69,11 +71,34 @@ with st.sidebar.expander("📍 Location"):
     Kerala – 695002
     """)
 
-with st.sidebar.expander("📞 Contact"):
-    st.markdown("""
-    🚑 **Emergency & Ambulance**  
-    **+91 9497 247 365**
-    """)
+# Appointment Booking Section (clickable)
+st.sidebar.subheader("📅 Appointment Booking")
+appointment_numbers = [
+    "+91 9876543210",
+    "+91 9678547645",
+    "+91 9234765840"
+]
+for num in appointment_numbers:
+    st.sidebar.markdown(f"📞 {num}")
+    st.sidebar.markdown(f"[Call {num}](tel:{num.replace(' ', '')})")
+
+# Emergency Contact Section (non-clickable)
+st.sidebar.subheader("🚨 Emergency Numbers")
+emergency_numbers = [
+    "+91 9678768843",
+    "+91 9568746574"
+]
+for num in emergency_numbers:
+    st.sidebar.markdown(f"⚠️ **{num}**")
+
+# General Contact Numbers (non-clickable)
+st.sidebar.subheader("📞 General Contact Numbers")
+general_numbers = [
+    "+91 9448123456",
+    "+91 9448234567"
+]
+for num in general_numbers:
+    st.sidebar.markdown(f"📱 {num}")
 
 # ===============================
 # SESSION STATE
@@ -91,10 +116,9 @@ if "booking" not in st.session_state:
     }
 
 # ===============================
-# CHAT HISTORY DISPLAY
+# CHAT HISTORY
 # ===============================
 for msg in st.session_state.messages:
-    content = msg["content"].replace("\n", "<br>")  # preserve line breaks
     if msg["role"] == "user":
         with st.chat_message("user"):
             st.markdown(f'''
@@ -105,9 +129,7 @@ for msg in st.session_state.messages:
                     border-radius: 10px;
                     margin: 5px;
                     display: inline-block;
-                    max-width: 70%;
-                    word-wrap: break-word;
-                ">{content}</div>
+                ">{msg["content"]}</div>
             ''', unsafe_allow_html=True)
     else:
         with st.chat_message("assistant"):
@@ -119,13 +141,12 @@ for msg in st.session_state.messages:
                     border-radius: 10px;
                     margin: 5px;
                     display: inline-block;
-                    max-width: 70%;
-                    word-wrap: break-word;
-                ">{content}</div>
+                    white-space: pre-line;
+                ">{msg["content"]}</div>
             ''', unsafe_allow_html=True)
 
 # ===============================
-# USER INPUT
+# INPUT
 # ===============================
 user_input = st.chat_input(
     "Ask about doctors, timings, availability, or book an appointment…"
@@ -148,14 +169,14 @@ if user_input:
         day = extract_day(user_input)
 
         if not doctor:
-            reply = "👨‍⚕️ Please specify the doctor's name to book an appointment."
+            reply = "👨⚕️ Please specify the doctor's name to book an appointment."
         else:
             booking.update({
                 "active": True,
                 "doctor": doctor,
                 "day": day
             })
-            reply = f"📅 Booking appointment with **{doctor}**.<br>Please tell your name."
+            reply = f"📅 Booking appointment with **{doctor}**.\nPlease tell your name."
 
     elif booking["active"] and not booking["patient"]:
         booking["patient"] = user_input.strip()
@@ -167,7 +188,10 @@ if user_input:
             start_t = datetime.strptime(start.strip(), "%I%p")
             end_t = datetime.strptime(end.strip(), "%I%p")
 
-            if start_t < datetime.strptime("9am", "%I%p") or end_t > datetime.strptime("8pm", "%I%p"):
+            if (
+                start_t < datetime.strptime("9am", "%I%p")
+                or end_t > datetime.strptime("8pm", "%I%p")
+            ):
                 reply = "⛔ Appointments allowed only between **9am and 8pm**."
             else:
                 booking["time"] = user_input.lower()
@@ -177,6 +201,8 @@ if user_input:
                     booking["day"] or datetime.now().strftime("%A"),
                     booking["time"]
                 )
+
+                # reset booking
                 st.session_state.booking = {
                     "active": False,
                     "doctor": None,
@@ -184,6 +210,7 @@ if user_input:
                     "patient": None,
                     "time": None
                 }
+
         except:
             reply = "❌ Invalid format. Use **10am to 11am**."
 
@@ -191,7 +218,6 @@ if user_input:
     else:
         reply = run_chatbot_query(user_input)
 
-    # append assistant response
     st.session_state.messages.append({
         "role": "assistant",
         "content": reply
