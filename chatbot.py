@@ -1,10 +1,10 @@
-# chatbot.py
+# chatbot.py (enhanced smart queries)
 import re
 import os
 import pandas as pd
 import torch
 import joblib
-from datetime import datetime, date, time
+from datetime import datetime, timedelta, date, time
 from transformers import BertTokenizer, BertForSequenceClassification
 import gdown
 
@@ -72,14 +72,11 @@ model_path = "./bert_doctor_classification"
 os.makedirs(model_path, exist_ok=True)
 model_file = os.path.join(model_path, "model.safetensors")
 
-# Download model if missing
 if not os.path.exists(model_file):
     print("⬇️ Downloading BERT model...")
     file_id = "1-eUWEBYaDUoAySlAHkoIyIsIllinlu5Z"
-    url = f"https://drive.google.com/uc?id={file_id}"
-    gdown.download(url, model_file, quiet=False)
+    gdown.download(f"https://drive.google.com/uc?id={file_id}", model_file, quiet=False)
 
-# Load tokenizer & model
 tokenizer = BertTokenizer.from_pretrained(model_path)
 model = BertForSequenceClassification.from_pretrained(model_path)
 label_encoder = joblib.load(os.path.join(model_path, "label_encoder.pkl"))
@@ -94,8 +91,9 @@ def detect_intent(text):
 # EXTRACTION HELPERS
 # ===============================
 def extract_doctor_name(text):
+    text = text.lower()
     for name in df["Doctor Name"].unique():
-        if name.lower() in text.lower():
+        if name.lower() in text:
             return name
     return None
 
@@ -119,6 +117,10 @@ def extract_day(text):
                 return day
     if "today" in text:
         return datetime.now().strftime("%A").lower()
+    elif "tomorrow" in text:
+        return (datetime.now() + timedelta(days=1)).strftime("%A").lower()
+    elif "yesterday" in text:
+        return (datetime.now() - timedelta(days=1)).strftime("%A").lower()
     return None
 
 def extract_column(text):
@@ -129,87 +131,41 @@ def extract_column(text):
                 return col
     return None
 
-def extract_time(text):
-    match = re.search(r'(\d{1,2})(am|pm)', text.lower())
-    if match:
-        return match.group(1) + match.group(2)
-    return None
-
 # ===============================
-# APPOINTMENT LOGIC
+# SMART QUERY FUNCTION
 # ===============================
-appointments_file = "appointments.csv"
-MAX_SLOTS_PER_DOCTOR = 5
-
-if not os.path.exists(appointments_file):
-    pd.DataFrame(columns=["Doctor Name", "Patient Name", "Date", "Time"]).to_csv(appointments_file, index=False)
-
-def is_past_datetime(appt_date, appt_time):
-    return datetime.combine(appt_date, appt_time) <= datetime.now()
-
-def book_appointment(doctor, patient, appt_date, time_slot):
-    appt_df = pd.read_csv(appointments_file)
-    
-    try:
-        appt_time = datetime.strptime(time_slot, "%I%p").time()
-    except:
-        return "⛔ Invalid time format. Example: 10AM"
-
-    if is_past_datetime(appt_date, appt_time):
-        return "⛔ Cannot book past date or time."
-
-    existing = appt_df[
-        (appt_df["Doctor Name"] == doctor) &
-        (appt_df["Date"] == str(appt_date)) &
-        (appt_df["Time"] == time_slot)
-    ]
-
-    if len(existing) >= MAX_SLOTS_PER_DOCTOR:
-        return f"⛔ Slot full for {doctor} at {time_slot}"
-
-    new_row = pd.DataFrame([[doctor, patient, appt_date, time_slot]], columns=appt_df.columns)
-    appt_df = pd.concat([appt_df, new_row], ignore_index=True)
-    appt_df.to_csv(appointments_file, index=False)
-
-    return f"✅ Appointment confirmed\n👨‍⚕️ Doctor: {doctor}\n📅 Date: {appt_date}\n⏰ Time: {time_slot}"
-
-# ===============================
-# RESPONSE FUNCTIONS
-# ===============================
-def list_all_doctors():
-    return "\n".join(
-        f"{row['Doctor Name']} - {row['Speciality']}"
-        for _, row in df.drop_duplicates("Doctor Name").iterrows()
-    )
-
 def run_chatbot_query(text):
     text_lower = text.lower()
-    intent = detect_intent(text)
     doctor = extract_doctor_name(text)
     speciality = extract_speciality(text)
+    day = extract_day(text)
     column = extract_column(text)
 
-    # All doctors
-    if "all doctors" in text_lower:
-        return list_all_doctors()
-
-    # List doctors by speciality
+    # 1️⃣ Filter by speciality + day
     if speciality:
         matches = df[df["Speciality"].str.lower().str.contains(speciality)]
+        if day:
+            matches = matches[matches["Available days"].str.lower().str.contains(day)]
         if matches.empty:
-            return f"No doctors found for {speciality}"
-        return "\n".join(f"{r['Doctor Name']} ({r['Speciality']})" for _, r in matches.iterrows())
+            return f"⚠️ No {speciality} available on {day if day else 'any day'}."
+        return "\n".join(f"👨‍⚕️ {r['Doctor Name']} ({r['Speciality']}) - {r['Available days']}" 
+                         for _, r in matches.iterrows())
 
-    # Doctor + column query
+    # 2️⃣ Doctor + column query
     if doctor and column:
         value = df[df["Doctor Name"] == doctor].iloc[0][column]
         return f"{doctor} {column.lower()}: {value}"
 
-    # Hospital location
+    # 3️⃣ All doctors
+    if "all doctors" in text_lower:
+        return "\n".join(f"{r['Doctor Name']} ({r['Speciality']}) - {r['Available days']}" 
+                         for _, r in df.drop_duplicates("Doctor Name").iterrows())
+
+    # 4️⃣ Hospital location
     if "hospital location" in text_lower or "location" in text_lower:
         return "📍 PRS Hospital, Killipalam, Thiruvananthapuram"
 
-    # Default fallback
+    # 5️⃣ Default fallback
     return ("🤖 I can help with:\n"
             "• Doctor details by name or speciality\n"
             "• Doctor qualification / degree\n"
