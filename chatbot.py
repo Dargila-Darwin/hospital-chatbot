@@ -1,10 +1,10 @@
-# chatbot.py (enhanced smart queries)
+# chatbot.py (enhanced)
 import re
 import os
 import pandas as pd
 import torch
 import joblib
-from datetime import datetime, timedelta, date, time
+from datetime import datetime, timedelta, time
 from transformers import BertTokenizer, BertForSequenceClassification
 import gdown
 
@@ -132,11 +132,80 @@ def extract_column(text):
     return None
 
 # ===============================
+# AVAILABILITY CHECK
+# ===============================
+def parse_consultation_time(time_str):
+    """
+    Converts '1PM to 3PM' or '09:00AM-12:00PM' to (start_time, end_time)
+    """
+    time_str = time_str.replace("to", "-").replace("–", "-").strip()
+    start_str, end_str = [s.strip() for s in time_str.split("-")]
+    start_time = datetime.strptime(start_str, "%I%p").time() if ":" not in start_str else datetime.strptime(start_str, "%I:%M%p").time()
+    end_time = datetime.strptime(end_str, "%I%p").time() if ":" not in end_str else datetime.strptime(end_str, "%I:%M%p").time()
+    return start_time, end_time
+
+def is_doctor_available(doctor_row, check_day, check_time=None):
+    """
+    Returns True if doctor is available on the given day and time
+    """
+    available_days = doctor_row["Available days"].lower()
+    if check_day not in available_days:
+        return False
+
+    if check_time:
+        start_time, end_time = parse_consultation_time(doctor_row["Consultation Time"])
+        if not (start_time <= check_time <= end_time):
+            return False
+    return True
+
+# ===============================
+# APPOINTMENT LOGIC
+# ===============================
+APPT_FILE = "appointments.csv"
+MAX_PATIENTS_PER_DAY = 20
+
+if not os.path.exists(APPT_FILE):
+    pd.DataFrame(columns=["Doctor Name","Patient Name","Date","Time"]).to_csv(APPT_FILE,index=False)
+
+def can_book(doctor_name, appt_date, appt_time):
+    df_appt = pd.read_csv(APPT_FILE)
+    day_count = df_appt[(df_appt["Doctor Name"] == doctor_name) & (df_appt["Date"] == str(appt_date))]
+    if len(day_count) >= MAX_PATIENTS_PER_DAY:
+        return False
+    # check same slot
+    slot_count = day_count[day_count["Time"] == appt_time.strftime("%I:%M%p").lower()]
+    if len(slot_count) >= 1:  # assume one patient per slot
+        return False
+    return True
+
+def book_appointment(doctor_row, patient_name, appt_date, appt_time):
+    if not is_doctor_available(doctor_row, appt_date.strftime("%A").lower(), appt_time):
+        return f"⛔ {doctor_row['Doctor Name']} is not available at {appt_time.strftime('%I:%M%p')} on {appt_date.strftime('%A')}."
+
+    if not can_book(doctor_row["Doctor Name"], appt_date, appt_time):
+        return f"⛔ Cannot book {doctor_row['Doctor Name']} on {appt_date.strftime('%A')}, limit reached."
+
+    df_appt = pd.read_csv(APPT_FILE)
+    df_appt.loc[len(df_appt)] = [
+        doctor_row["Doctor Name"],
+        patient_name,
+        str(appt_date),
+        appt_time.strftime("%I:%M%p").lower()
+    ]
+    df_appt.to_csv(APPT_FILE, index=False)
+
+    return (f"✅ Appointment confirmed\n"
+            f"👨‍⚕️ Doctor: {doctor_row['Doctor Name']}\n"
+            f"👤 Patient: {patient_name}\n"
+            f"📅 Date: {appt_date}\n"
+            f"⏰ Time: {appt_time.strftime('%I:%M%p')}")
+
+# ===============================
 # SMART QUERY FUNCTION
 # ===============================
 def run_chatbot_query(text):
     text_lower = text.lower()
-    doctor = extract_doctor_name(text)
+    doctor_name = extract_doctor_name(text)
     speciality = extract_speciality(text)
     day = extract_day(text)
     column = extract_column(text)
@@ -145,20 +214,20 @@ def run_chatbot_query(text):
     if speciality:
         matches = df[df["Speciality"].str.lower().str.contains(speciality)]
         if day:
-            matches = matches[matches["Available days"].str.lower().str.contains(day)]
+            matches = matches[matches.apply(lambda r: is_doctor_available(r, day), axis=1)]
         if matches.empty:
             return f"⚠️ No {speciality} available on {day if day else 'any day'}."
-        return "\n".join(f"👨‍⚕️ {r['Doctor Name']} ({r['Speciality']}) - {r['Available days']}" 
+        return "\n".join(f"👨‍⚕️ {r['Doctor Name']} ({r['Speciality']}) - {r['Available days']} ({r['Consultation Time']})"
                          for _, r in matches.iterrows())
 
     # 2️⃣ Doctor + column query
-    if doctor and column:
-        value = df[df["Doctor Name"] == doctor].iloc[0][column]
-        return f"{doctor} {column.lower()}: {value}"
+    if doctor_name and column:
+        value = df[df["Doctor Name"] == doctor_name].iloc[0][column]
+        return f"{doctor_name} {column.lower()}: {value}"
 
     # 3️⃣ All doctors
     if "all doctors" in text_lower:
-        return "\n".join(f"{r['Doctor Name']} ({r['Speciality']}) - {r['Available days']}" 
+        return "\n".join(f"{r['Doctor Name']} ({r['Speciality']}) - {r['Available days']} ({r['Consultation Time']})"
                          for _, r in df.drop_duplicates("Doctor Name").iterrows())
 
     # 4️⃣ Hospital location
