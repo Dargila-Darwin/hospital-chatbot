@@ -1,10 +1,12 @@
 # chatbot.py
 import re
+import os
 import pandas as pd
 import torch
 import joblib
 from datetime import datetime, date, time
 from transformers import BertTokenizer, BertForSequenceClassification
+import gdown
 
 # ===============================
 # LOAD DATASET
@@ -22,21 +24,74 @@ for col in [
     df[col] = df[col].apply(norm)
 
 # ===============================
-# LOAD BERT (UNCHANGED)
+# SPECIALITY & DAY SYNONYMS
+# ===============================
+SPECIALITY_SYNONYMS = {
+    "cardiologist": ["cardio", "heart", "cardiology"],
+    "ent": ["ear nose throat", "otolaryngology"],
+    "gastroenterologist": ["gastro", "digestive", "hepatology"],
+    "gynecologist": ["gyn", "obg", "obstetrics", "fertility"],
+    "nephrologist": ["kidney"],
+    "neurologist": ["neuro", "brain", "stroke"],
+    "urologist": ["urinary", "genito-urinary"],
+    "pulmonologist": ["respiratory", "lungs", "tb"],
+    "dermatologist": ["skin"],
+    "ophthalmologist": ["eye"],
+    "orthopaedician": ["ortho", "orthopedic"],
+    "oncologist": ["cancer", "oncology"],
+    "pathologist": ["pathology"],
+    "radiologist": ["radiology"],
+    "psychiatrist": ["mental health", "psych"],
+    "psychologist": ["counseling"],
+    "endocrinologist": ["endocrine", "hormone"],
+    "general surgeon": ["surgery"],
+    "paediatrician": ["paed", "child doctor"],
+}
+
+DAY_SYNONYMS = {
+    "monday": ["mon"], "tuesday": ["tue"], "wednesday": ["wed"],
+    "thursday": ["thu"], "friday": ["fri"],
+    "saturday": ["sat"], "sunday": ["sun"]
+}
+
+COLUMN_ALIASES = {
+    "Doctor Name": ["doctor name", "name"],
+    "Speciality": ["speciality", "specialty", "specialisation", "specialization"],
+    "Consultation Time": ["consultation time", "timings", "hours", "availability", "time"],
+    "Available days": ["consultation days", "days", "available days", "availability days", "day"],
+    "Contact": ["contact", "phone", "mobile", "number", "appointment", "book appointment", "contact details"],
+    "Email": ["email", "mail"],
+    "Location": ["location", "address", "hospital location"],
+    "Professional Degree": ["degree", "qualification", "qualifications"],
+}
+
+# ===============================
+# MODEL SETUP
 # ===============================
 model_path = "./bert_doctor_classification"
+os.makedirs(model_path, exist_ok=True)
+model_file = os.path.join(model_path, "model.safetensors")
+
+# Download model if missing
+if not os.path.exists(model_file):
+    print("⬇️ Downloading BERT model...")
+    file_id = "1-eUWEBYaDUoAySlAHkoIyIsIllinlu5Z"
+    url = f"https://drive.google.com/uc?id={file_id}"
+    gdown.download(url, model_file, quiet=False)
+
+# Load tokenizer & model
 tokenizer = BertTokenizer.from_pretrained(model_path)
 model = BertForSequenceClassification.from_pretrained(model_path)
-label_encoder = joblib.load(model_path + "/label_encoder.pkl")
+label_encoder = joblib.load(os.path.join(model_path, "label_encoder.pkl"))
 
 def detect_intent(text):
-    inputs = tokenizer(text, return_tensors="pt")
+    inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
     outputs = model(**inputs)
     pred = torch.argmax(outputs.logits).item()
     return label_encoder.inverse_transform([pred])[0]
 
 # ===============================
-# HELPERS
+# EXTRACTION HELPERS
 # ===============================
 def extract_doctor_name(text):
     for name in df["Doctor Name"].unique():
@@ -44,44 +99,65 @@ def extract_doctor_name(text):
             return name
     return None
 
+def extract_speciality(text):
+    text = text.lower()
+    for spec, keywords in SPECIALITY_SYNONYMS.items():
+        if spec in text:
+            return spec
+        for kw in keywords:
+            if kw in text:
+                return spec
+    return None
+
 def extract_day(text):
-    days = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
-    for d in days:
-        if d in text.lower():
-            return d
-    if "today" in text.lower():
+    text = text.lower()
+    for day, shorts in DAY_SYNONYMS.items():
+        if day in text:
+            return day
+        for s in shorts:
+            if s in text:
+                return day
+    if "today" in text:
         return datetime.now().strftime("%A").lower()
     return None
 
+def extract_column(text):
+    text = text.lower()
+    for col, aliases in COLUMN_ALIASES.items():
+        for a in aliases:
+            if a in text:
+                return col
+    return None
+
+def extract_time(text):
+    match = re.search(r'(\d{1,2})(am|pm)', text.lower())
+    if match:
+        return match.group(1) + match.group(2)
+    return None
+
 # ===============================
-# APPOINTMENT LOGIC (ENHANCED)
+# APPOINTMENT LOGIC
 # ===============================
 appointments_file = "appointments.csv"
 MAX_SLOTS_PER_DOCTOR = 5
 
-try:
-    appt_df = pd.read_csv(appointments_file)
-except FileNotFoundError:
-    appt_df = pd.DataFrame(
-        columns=["Doctor Name", "Patient Name", "Date", "Time"]
-    )
-    appt_df.to_csv(appointments_file, index=False)
+if not os.path.exists(appointments_file):
+    pd.DataFrame(columns=["Doctor Name", "Patient Name", "Date", "Time"]).to_csv(appointments_file, index=False)
 
 def is_past_datetime(appt_date, appt_time):
-    now = datetime.now()
-    return datetime.combine(appt_date, appt_time) <= now
+    return datetime.combine(appt_date, appt_time) <= datetime.now()
 
 def book_appointment(doctor, patient, appt_date, time_slot):
     appt_df = pd.read_csv(appointments_file)
+    
+    try:
+        appt_time = datetime.strptime(time_slot, "%I%p").time()
+    except:
+        return "⛔ Invalid time format. Example: 10AM"
 
-    time_slot = time_slot.lower()
-    appt_time = datetime.strptime(time_slot, "%I%p").time()
-
-    # ⛔ Past date/time check
     if is_past_datetime(appt_date, appt_time):
         return "⛔ Cannot book past date or time."
 
-    # 🔒 Slot limit
     existing = appt_df[
         (appt_df["Doctor Name"] == doctor) &
         (appt_df["Date"] == str(appt_date)) &
@@ -89,22 +165,16 @@ def book_appointment(doctor, patient, appt_date, time_slot):
     ]
 
     if len(existing) >= MAX_SLOTS_PER_DOCTOR:
-        return f"⛔ Slot full for **{doctor}** at **{time_slot}**."
+        return f"⛔ Slot full for {doctor} at {time_slot}"
 
-    new_row = pd.DataFrame([[doctor, patient, appt_date, time_slot]],
-                           columns=appt_df.columns)
+    new_row = pd.DataFrame([[doctor, patient, appt_date, time_slot]], columns=appt_df.columns)
     appt_df = pd.concat([appt_df, new_row], ignore_index=True)
     appt_df.to_csv(appointments_file, index=False)
 
-    return (
-        f"✅ Appointment confirmed\n"
-        f"👨‍⚕️ Doctor: {doctor}\n"
-        f"📅 Date: {appt_date}\n"
-        f"⏰ Time: {time_slot}"
-    )
+    return f"✅ Appointment confirmed\n👨‍⚕️ Doctor: {doctor}\n📅 Date: {appt_date}\n⏰ Time: {time_slot}"
 
 # ===============================
-# RESPONSES
+# RESPONSE FUNCTIONS
 # ===============================
 def list_all_doctors():
     return "\n".join(
@@ -113,24 +183,37 @@ def list_all_doctors():
     )
 
 def run_chatbot_query(text):
+    text_lower = text.lower()
     intent = detect_intent(text)
     doctor = extract_doctor_name(text)
+    speciality = extract_speciality(text)
+    column = extract_column(text)
 
-    if "all doctors" in text.lower():
+    # All doctors
+    if "all doctors" in text_lower:
         return list_all_doctors()
 
-    if doctor and "speciality" in text.lower():
-        row = df[df["Doctor Name"] == doctor].iloc[0]
-        return f"{doctor} speciality: {row['Speciality']}"
+    # List doctors by speciality
+    if speciality:
+        matches = df[df["Speciality"].str.lower().str.contains(speciality)]
+        if matches.empty:
+            return f"No doctors found for {speciality}"
+        return "\n".join(f"{r['Doctor Name']} ({r['Speciality']})" for _, r in matches.iterrows())
 
-    if doctor and "degree" in text.lower():
-        row = df[df["Doctor Name"] == doctor].iloc[0]
-        return f"{doctor} degree: {row['Professional Degree']}"
+    # Doctor + column query
+    if doctor and column:
+        value = df[df["Doctor Name"] == doctor].iloc[0][column]
+        return f"{doctor} {column.lower()}: {value}"
 
-    if "hospital location" in text.lower():
+    # Hospital location
+    if "hospital location" in text_lower or "location" in text_lower:
         return "📍 PRS Hospital, Killipalam, Thiruvananthapuram"
 
-    return (
-        "I can help you find doctors, availability, degree, "
-        "contact details, hospital location, and book appointments."
-    )
+    # Default fallback
+    return ("🤖 I can help with:\n"
+            "• Doctor details by name or speciality\n"
+            "• Doctor qualification / degree\n"
+            "• Consultation timings & availability\n"
+            "• Contact details\n"
+            "• Hospital location\n"
+            "• Booking appointments")
