@@ -51,33 +51,49 @@ def detect_intent(user_query):
 # HELPERS
 # ===============================
 SPECIALITY_SYNONYMS = {
-    "cardiologist": ["cardio", "heart", "cardiology", "interventional cardiologist", "chief cardiologist", "caardio"],
-    "ent": ["ear nose throat", "otolaryngology", "laryngology", "phonosurgery", "vertigo"],
-    "gastroenterologist": ["gastro", "digestive", "hepatology", "pediatric gastroenterology"],
+    "cardiologist": ["cardio", "heart", "cardiology"],
+    "ent": ["ear nose throat", "otolaryngology"],
+    "gastroenterologist": ["gastro", "digestive", "hepatology"],
     "gynecologist": ["gyn", "obg", "obstetrics", "fertility"],
     "nephrologist": ["kidney"],
-    "neurologist": ["neuro", "brain", "neurovascular", "stroke"],
+    "neurologist": ["neuro", "brain", "stroke"],
     "urologist": ["urinary", "genito-urinary"],
     "pulmonologist": ["respiratory", "lungs", "tb"],
     "dermatologist": ["skin"],
     "ophthalmologist": ["eye"],
-    "orthopaedician": ["ortho", "orthopedic", "arthroscopy"],
-    "oncologist": ["cancer", "medical oncology", "surgical oncology", "clinical oncology"],
+    "orthopaedician": ["ortho", "orthopedic"],
+    "oncologist": ["cancer", "oncology"],
     "pathologist": ["pathology"],
-    "radiologist": ["radiology", "radiodiagnosis", "interventional radiology"],
-    "psychiatrist": ["mental health", "psych","Psychiatrist"],
+    "radiologist": ["radiology"],
+    "psychiatrist": ["mental health", "psych"],
     "psychologist": ["counseling"],
     "endocrinologist": ["endocrine", "hormone"],
-    "general surgeon": ["gen surg", "surgery"],
-    "paediatrician": ["kids doctor", "paed", "pediatrician", "child doctor"],
-
+    "general surgeon": ["surgery"],
+    "paediatrician": ["paed", "child doctor"],
 }
 
 DAY_SYNONYMS = {
     "monday": ["mon"], "tuesday": ["tue"], "wednesday": ["wed"],
-    "thursday": ["thu"], "friday": ["fri"],
-    "saturday": ["sat"], "sunday": ["sun"]
+    "thursday": ["thu"], "friday": ["fri"], "saturday": ["sat"], "sunday": ["sun"]
 }
+
+COLUMN_ALIASES = {
+    "Doctor Name": ["doctor name", "name"],
+    "Speciality": ["speciality", "specialty", "specialisation", "specialization"],
+    "Consultation Time": ["consultation time", "timings", "hours", "availability", "time"],
+    "Available days": ["consultation days", "days", "available days", "availability days", "day"],
+    "Contact": ["contact", "phone", "mobile", "number", "appointment", "book appointment", "contact details"],
+    "Email": ["email", "mail"],
+    "Location": ["location", "address", "hospital location"],
+    "Professional Degree": ["degree", "qualification", "qualifications"],
+}
+
+def map_field_alias(user_query):
+    q = user_query.lower()
+    for col, aliases in COLUMN_ALIASES.items():
+        if any(alias in q for alias in aliases):
+            return col
+    return None
 
 # ===============================
 # EXTRACTION
@@ -122,7 +138,7 @@ def is_available_on(day, txt):
     return True
 
 # ===============================
-# APPOINTMENT BOOKING (✅ ADDED)
+# APPOINTMENT BOOKING
 # ===============================
 appointments_file = "appointments.csv"
 
@@ -139,23 +155,17 @@ def book_appointment(doctor_name, patient_name, day, time_slot):
         return "Doctor not found."
 
     # convert AM/PM → am/pm
-    time_slot = time_slot.replace("AM", "am").replace("PM", "pm")
+    time_slot = time_slot.replace("AM","am").replace("PM","pm")
 
-    new_row = pd.DataFrame([[
-        doctor_name,
-        patient_name,
-        day.capitalize(),
-        time_slot
-    ]], columns=["Doctor Name", "Patient Name", "Day", "Time"])
-
+    new_row = pd.DataFrame([[doctor_name, patient_name, day.capitalize(), time_slot]],
+                           columns=["Doctor Name", "Patient Name", "Day", "Time"])
     appt_df = pd.read_csv(appointments_file)
     appt_df = pd.concat([appt_df, new_row], ignore_index=True)
     appt_df.to_csv(appointments_file, index=False)
-
     return f"✅ Appointment confirmed with **{doctor_name}** on **{day.capitalize()}** at **{time_slot}**."
 
 # ===============================
-# RESPONSE BUILDERS (LINE-BY-LINE ✅)
+# RESPONSE BUILDERS
 # ===============================
 def list_all_doctors():
     seen = {}
@@ -197,28 +207,46 @@ def chatbot_response(user_query):
     doctor = extract_doctor_name(user_query)
     day = extract_day(user_query)
     specialty = match_specialty(user_query)
+    requested_field = map_field_alias(user_query)
 
-    if "all doctors" in user_query.lower():
-        return list_all_doctors()
+    # Hospital location query
+    if requested_field == "Location":
+        return "📍 PRS Hospital, Killipalam, Trivandrum"
 
+    # Doctor-specific field queries
+    if doctor and requested_field:
+        row = df[df["Doctor Name"]==doctor].iloc[0]
+        if requested_field == "Speciality":
+            return f"{doctor} speciality: {row['Speciality']}"
+        elif requested_field == "Professional Degree":
+            return f"{doctor} degree: {row['Professional Degree']}"
+        elif requested_field == "Contact":
+            return f"Contact: {row['Contact']} | Email: {row['Email']}"
+        elif requested_field == "Consultation Time":
+            return f"{doctor} timings: {row['Consultation Time'].replace('AM','am').replace('PM','pm')}"
+        elif requested_field == "Available days":
+            return f"{doctor} available days: {row['Available days']}"
+
+    # Day + Specialty / Doctor availability
     if day and specialty:
         return availability_on_day_for_specialty(specialty, day)
-
     if day and doctor:
         return availability_on_day_for_doctor(doctor, day)
 
-    if "contact" in user_query.lower() and doctor:
-        return get_contact_block(doctor)
+    # List all doctors
+    if "all doctors" in user_query.lower():
+        return list_all_doctors()
 
+    # Find doctor by specialty
     if intent == "find_doctor" and specialty:
         return list_doctors_by_specialty(specialty)
 
+    # Doctor availability intent
     if intent == "doctor_availability" and doctor:
-        row = df[df["Doctor Name"].str.contains(re.escape(doctor), case=False)]
-        time = row.iloc[0]["Consultation Time"].replace("AM","am").replace("PM","pm")
-        return f"{doctor} - {time}"
+        row = df[df["Doctor Name"]==doctor].iloc[0]
+        return f"{doctor} - {row['Consultation Time'].replace('AM','am').replace('PM','pm')}"
 
-    return "I can help you find doctors, availability, contact details, and book appointments."
+    return "I can help you find doctors, availability, contact details, degree, timings, hospital location, and book appointments."
 
 # ===============================
 # STREAMLIT HELPER
