@@ -1,6 +1,5 @@
 import streamlit as st
 from datetime import datetime
-import re
 from chatbot import (
     run_chatbot_query,
     extract_doctor_name,
@@ -22,7 +21,9 @@ st.set_page_config(
 # ===============================
 st.markdown(
     """
-    <h1 style="text-align:center; color:#084298;">🏥 PRS Hospital – Chatbot Assistant</h1>
+    <h1 style="text-align:center; color:#084298;">
+        🏥 PRS Hospital – Chatbot Assistant
+    </h1>
     <hr>
     """,
     unsafe_allow_html=True
@@ -34,38 +35,44 @@ st.markdown(
 with st.sidebar.expander("ℹ️ About"):
     st.markdown("""
     **PRS Hospital, Trivandrum**  
-    37+ years of excellence in healthcare.
+    37+ years of excellence in healthcare with modern facilities.
     """)
 
-with st.sidebar.expander("Specialities"):
+with st.sidebar.expander("🩺 Specialities"):
     st.markdown("""
-    <ul>
-        <li>Cardiologist</li>
-        <li>ENT</li>
-        <li>Gastroenterologist</li>
-        <li>Gynecologist</li>
-        <li>Nephrologist</li>
-        <li>Neurologist</li>
-        <li>Urologist</li>
-        <li>Pulmonologist</li>
-        <li>Dermatologist</li>
-        <li>Ophthalmologist</li>
-        <li>Orthopaedician</li>
-        <li>Oncologist</li>
-        <li>Pathologist</li>
-        <li>Radiologist</li>
-        <li>Psychiatrist</li>
-        <li>Psychologist</li>
-        <li>Endocrinologist</li>
-        <li>General Surgeon</li>
-        <li>Paediatrician</li>
-    </ul>
-    """, unsafe_allow_html=True)
+    - Cardiologist  
+    - ENT  
+    - Gastroenterologist  
+    - Gynecologist  
+    - Nephrologist  
+    - Neurologist  
+    - Urologist  
+    - Pulmonologist  
+    - Dermatologist  
+    - Ophthalmologist  
+    - Orthopaedician  
+    - Oncologist  
+    - Pathologist  
+    - Radiologist  
+    - Psychiatrist  
+    - Psychologist  
+    - Endocrinologist  
+    - General Surgeon  
+    - Paediatrician  
+    """)
 
-with st.sidebar.expander("📍 Location / Contact"):
+with st.sidebar.expander("📍 Location"):
     st.markdown("""
-    📍 Killipalam, Trivandrum  
-    🚑 Emergency: **+91 9497 247 365**
+    **PRS Hospital**  
+    Killipalam,  
+    Thiruvananthapuram,  
+    Kerala – 695002
+    """)
+
+with st.sidebar.expander("📞 Contact"):
+    st.markdown("""
+    🚑 **Emergency & Ambulance**  
+    **+91 9497 247 365**
     """)
 
 # ===============================
@@ -84,47 +91,44 @@ if "booking" not in st.session_state:
     }
 
 # ===============================
-# HELPER: FORMAT DOCTORS (LINE BY LINE)
-# ===============================
-def format_doctor_list(text: str) -> str:
-    """
-    Converts doctor listings into line-by-line format
-    """
-    # Extract pattern like: Dr. Name - 10am to 11am
-    doctors = re.findall(r"Dr\. [A-Za-z\s\.]+ - [0-9:\samPMto]+", text, re.IGNORECASE)
-    if doctors:
-        return "\n".join([d.replace("AM","am").replace("PM","pm") for d in doctors])
-    return text
-
-# ===============================
-# DISPLAY CHAT HISTORY
+# CHAT HISTORY
 # ===============================
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
-        st.markdown(msg["content"].replace("\n", "<br>"), unsafe_allow_html=True)
+        st.markdown(msg["content"])
 
 # ===============================
-# USER INPUT
+# INPUT
 # ===============================
-user_input = st.chat_input("Ask about doctors, timings, availability, or booking…")
+user_input = st.chat_input(
+    "Ask about doctors, timings, availability, or book an appointment…"
+)
 
 # ===============================
 # CHAT + BOOKING LOGIC
 # ===============================
 if user_input:
-    st.session_state.messages.append({"role": "user", "content": user_input})
+    st.session_state.messages.append({
+        "role": "user",
+        "content": user_input
+    })
+
     booking = st.session_state.booking
 
-    # ---- BOOK APPOINTMENT FLOW ----
+    # ---------- BOOK APPOINTMENT ----------
     if not booking["active"] and "book" in user_input.lower():
         doctor = extract_doctor_name(user_input)
         day = extract_day(user_input)
 
         if not doctor:
-            reply = "👨‍⚕️ Please specify the doctor's name to book an appointment."
+            reply = "👨⚕️ Please specify the doctor's name to book an appointment."
         else:
-            booking.update({"active": True, "doctor": doctor, "day": day})
-            reply = f"📅 Booking appointment with **{doctor}**. Please tell your name."
+            booking.update({
+                "active": True,
+                "doctor": doctor,
+                "day": day
+            })
+            reply = f"📅 Booking appointment with **{doctor}**.\nPlease tell your name."
 
     elif booking["active"] and not booking["patient"]:
         booking["patient"] = user_input.strip()
@@ -136,7 +140,10 @@ if user_input:
             start_t = datetime.strptime(start.strip(), "%I%p")
             end_t = datetime.strptime(end.strip(), "%I%p")
 
-            if start_t < datetime.strptime("9am", "%I%p") or end_t > datetime.strptime("8pm", "%I%p"):
+            if (
+                start_t < datetime.strptime("9am", "%I%p")
+                or end_t > datetime.strptime("8pm", "%I%p")
+            ):
                 reply = "⛔ Appointments allowed only between **9am and 8pm**."
             else:
                 booking["time"] = user_input.lower()
@@ -146,14 +153,26 @@ if user_input:
                     booking["day"] or datetime.now().strftime("%A"),
                     booking["time"]
                 )
-                st.session_state.booking = {"active": False, "doctor": None, "day": None, "patient": None, "time": None}
+
+                # reset booking
+                st.session_state.booking = {
+                    "active": False,
+                    "doctor": None,
+                    "day": None,
+                    "patient": None,
+                    "time": None
+                }
+
         except:
             reply = "❌ Invalid format. Use **10am to 11am**."
 
-    # ---- NORMAL CHAT ----
+    # ---------- NORMAL CHAT ----------
     else:
         reply = run_chatbot_query(user_input)
-        reply = format_doctor_list(reply)
 
-    st.session_state.messages.append({"role": "assistant", "content": reply})
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": reply
+    })
+
     st.rerun()
