@@ -23,7 +23,6 @@ gdown.download(url, output, quiet=False)
 # ===============================
 df = pd.read_csv("Hospital_Information124.csv")
 
-# Normalize text
 def norm(s):
     return str(s).strip()
 
@@ -35,7 +34,7 @@ for col in [
     df[col] = df[col].apply(norm)
 
 # ===============================
-# LOAD BERT (UNCHANGED)
+# LOAD BERT (UNCHANGED ✅)
 # ===============================
 model_path = "./bert_doctor_classification"
 tokenizer = BertTokenizer.from_pretrained(model_path)
@@ -52,17 +51,33 @@ def detect_intent(user_query):
 # HELPERS
 # ===============================
 SPECIALITY_SYNONYMS = {
-    "cardiologist": ["cardio", "heart"],
-    "ent": ["ear nose throat"],
-    "neurologist": ["neuro", "brain"],
-    "orthopaedician": ["ortho"],
+    "cardiologist": ["cardio", "heart", "cardiology", "interventional cardiologist", "chief cardiologist", "caardio"],
+    "ent": ["ear nose throat", "otolaryngology", "laryngology", "phonosurgery", "vertigo"],
+    "gastroenterologist": ["gastro", "digestive", "hepatology", "pediatric gastroenterology"],
+    "gynecologist": ["gyn", "obg", "obstetrics", "fertility"],
+    "nephrologist": ["kidney"],
+    "neurologist": ["neuro", "brain", "neurovascular", "stroke"],
+    "urologist": ["urinary", "genito-urinary"],
+    "pulmonologist": ["respiratory", "lungs", "tb"],
+    "dermatologist": ["skin"],
+    "ophthalmologist": ["eye"],
+    "orthopaedician": ["ortho", "orthopedic", "arthroscopy"],
+    "oncologist": ["cancer", "medical oncology", "surgical oncology", "clinical oncology"],
+    "pathologist": ["pathology"],
+    "radiologist": ["radiology", "radiodiagnosis", "interventional radiology"],
+    "psychiatrist": ["mental health", "psych","Psychiatrist"],
+    "psychologist": ["counseling"],
+    "endocrinologist": ["endocrine", "hormone"],
+    "general surgeon": ["gen surg", "surgery"],
+    "paediatrician": ["kids doctor", "paed", "pediatrician", "child doctor"],
+
 }
 
 DAY_SYNONYMS = {
     "monday": ["mon"], "tuesday": ["tue"], "wednesday": ["wed"],
-    "thursday": ["thu"], "friday": ["fri"], "saturday": ["sat"], "sunday": ["sun"]
+    "thursday": ["thu"], "friday": ["fri"],
+    "saturday": ["sat"], "sunday": ["sun"]
 }
-WEEKDAYS = list(DAY_SYNONYMS.keys())
 
 # ===============================
 # EXTRACTION
@@ -107,50 +122,69 @@ def is_available_on(day, txt):
     return True
 
 # ===============================
-# RESPONSE BUILDERS (FIXED)
+# APPOINTMENT BOOKING (✅ ADDED)
+# ===============================
+appointments_file = "appointments.csv"
+
+try:
+    pd.read_csv(appointments_file)
+except FileNotFoundError:
+    pd.DataFrame(
+        columns=["Doctor Name", "Patient Name", "Day", "Time"]
+    ).to_csv(appointments_file, index=False)
+
+def book_appointment(doctor_name, patient_name, day, time_slot):
+    row = df[df["Doctor Name"].str.contains(re.escape(doctor_name), case=False)]
+    if row.empty:
+        return "Doctor not found."
+
+    # convert AM/PM → am/pm
+    time_slot = time_slot.replace("AM", "am").replace("PM", "pm")
+
+    new_row = pd.DataFrame([[
+        doctor_name,
+        patient_name,
+        day.capitalize(),
+        time_slot
+    ]], columns=["Doctor Name", "Patient Name", "Day", "Time"])
+
+    appt_df = pd.read_csv(appointments_file)
+    appt_df = pd.concat([appt_df, new_row], ignore_index=True)
+    appt_df.to_csv(appointments_file, index=False)
+
+    return f"✅ Appointment confirmed with **{doctor_name}** on **{day.capitalize()}** at **{time_slot}**."
+
+# ===============================
+# RESPONSE BUILDERS (LINE-BY-LINE ✅)
 # ===============================
 def list_all_doctors():
     seen = {}
     for _, row in df.iterrows():
         seen[row["Doctor Name"]] = row["Speciality"]
-    return "\n".join([f"{k} - {v}" for k, v in seen.items()])
-
+    return "\n".join(f"{k} - {v}" for k, v in seen.items())
 
 def list_doctors_by_specialty(specialty):
     rows = df[df["Speciality"].str.contains(specialty, case=False, na=False)]
-    if rows.empty:
-        return f"No {specialty} doctors found."
-
     doctors = {}
     for _, row in rows.iterrows():
-        doctors[row["Doctor Name"]] = row["Consultation Time"]
-
-    return "\n".join([f"{doc} - {time}" for doc, time in doctors.items()])
-
+        doctors[row["Doctor Name"]] = row["Consultation Time"].replace("AM","am").replace("PM","pm")
+    return "\n".join(f"{k} - {v}" for k, v in doctors.items())
 
 def availability_on_day_for_specialty(specialty, day):
-    rows = df[df["Speciality"].str.contains(specialty, case=False, na=False)]
-    lines = {}
+    rows = df[df["Speciality"].str.contains(specialty, case=False)]
+    doctors = {}
     for _, row in rows.iterrows():
         if is_available_on(day, row["Available days"]):
-            lines[row["Doctor Name"]] = row["Consultation Time"]
-    if not lines:
-        return f"No {specialty} doctors available on {day.capitalize()}."
-    return "\n".join([f"{k} - {v}" for k, v in lines.items()])
-
+            doctors[row["Doctor Name"]] = row["Consultation Time"].replace("AM","am").replace("PM","pm")
+    return "\n".join(f"{k} - {v}" for k, v in doctors.items())
 
 def availability_on_day_for_doctor(name, day):
     row = df[df["Doctor Name"].str.contains(re.escape(name), case=False)]
-    if row.empty:
-        return "Doctor not found."
     ok = is_available_on(day, row.iloc[0]["Available days"])
     return f"{name} is {'available' if ok else 'not available'} on {day.capitalize()}."
 
-
 def get_contact_block(name):
     row = df[df["Doctor Name"].str.contains(re.escape(name), case=False)]
-    if row.empty:
-        return "Doctor not found."
     r = row.iloc[0]
     return f"Contact: {r['Contact']} | Email: {r['Email']}"
 
@@ -159,13 +193,12 @@ def get_contact_block(name):
 # ===============================
 def chatbot_response(user_query):
     intent = detect_intent(user_query)
-    q = user_query.lower()
 
     doctor = extract_doctor_name(user_query)
     day = extract_day(user_query)
     specialty = match_specialty(user_query)
 
-    if "all doctors" in q or "list doctors" in q:
+    if "all doctors" in user_query.lower():
         return list_all_doctors()
 
     if day and specialty:
@@ -174,7 +207,7 @@ def chatbot_response(user_query):
     if day and doctor:
         return availability_on_day_for_doctor(doctor, day)
 
-    if "contact" in q and doctor:
+    if "contact" in user_query.lower() and doctor:
         return get_contact_block(doctor)
 
     if intent == "find_doctor" and specialty:
@@ -182,9 +215,10 @@ def chatbot_response(user_query):
 
     if intent == "doctor_availability" and doctor:
         row = df[df["Doctor Name"].str.contains(re.escape(doctor), case=False)]
-        return f"{doctor} - {row.iloc[0]['Consultation Time']}"
+        time = row.iloc[0]["Consultation Time"].replace("AM","am").replace("PM","pm")
+        return f"{doctor} - {time}"
 
-    return "I can help you find doctors, timings, availability, and contact details."
+    return "I can help you find doctors, availability, contact details, and book appointments."
 
 # ===============================
 # STREAMLIT HELPER
