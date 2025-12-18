@@ -1,12 +1,8 @@
 import streamlit as st
 from datetime import datetime, time, timedelta
-import pandas as pd
 
 from chatbot import (
     run_chatbot_query,
-    extract_doctor_name,
-    extract_day,
-    match_specialty,
     book_appointment,
     df
 )
@@ -25,9 +21,17 @@ st.set_page_config(
 # ===============================
 st.markdown(
     """
-    <h1 style='text-align:center; position:sticky; top:0; background:#0f172a;
-    color:white; padding:12px; border-radius:8px; z-index:999'>
-    🏥 PRS Hospital Assistant Chatbot
+    <h1 style="
+        text-align:center;
+        position:sticky;
+        top:0;
+        background:#0f172a;
+        color:white;
+        padding:14px;
+        border-radius:10px;
+        z-index:999;
+    ">
+        🏥 PRS Hospital Assistant Chatbot
     </h1>
     """,
     unsafe_allow_html=True
@@ -37,7 +41,6 @@ st.markdown(
 # SIDEBAR
 # ===============================
 st.sidebar.title("📌 PRS Hospital")
-
 menu = st.sidebar.radio(
     "Navigate",
     ["💬 Chatbot", "📅 Book Appointment", "👨‍⚕️ Doctors", "ℹ️ About"]
@@ -47,82 +50,121 @@ menu = st.sidebar.radio(
 # ABOUT
 # ===============================
 if menu == "ℹ️ About":
-    st.info(
+    st.markdown(
         """
-        **PRS Hospital – Thiruvananthapuram**
+        ### 🏥 About PRS Hospital
+        **PRS Hospital, Thiruvananthapuram**
 
         ✔ Multi-specialty hospital  
-        ✔ Expert doctors  
-        ✔ 9 AM – 8 PM consultations  
-        ✔ Easy appointment booking
+        ✔ Experienced doctors  
+        ✔ Consultation: 9 AM – 8 PM  
+        ✔ Easy online appointment booking  
         """
     )
 
 # ===============================
-# DOCTOR LIST
+# DOCTORS TAB (STYLED + LINE BY LINE)
 # ===============================
 elif menu == "👨‍⚕️ Doctors":
-    st.subheader("👨‍⚕️ Our Doctors")
+
+    st.markdown(
+        """
+        <h2 style="
+            text-align:center;
+            color:#1e3a8a;
+            font-weight:800;
+            margin-bottom:20px;
+        ">
+            👨‍⚕️ Our Expert Doctors
+        </h2>
+        """,
+        unsafe_allow_html=True
+    )
 
     for _, r in df.iterrows():
         st.markdown(
             f"""
-            **{r['Doctor Name']}**  
-            🩺 {r['Speciality']}  
-            ⏰ {r['Consultation Time']}  
-            📅 {r['Available days']}  
-            📍 {r['Location']}
-            ---
-            """
+            <div style="
+                width:100%;
+                background-color:#f8fafc;
+                padding:18px;
+                margin-bottom:15px;
+                border-left:6px solid #2563eb;
+                border-radius:12px;
+                box-shadow:0 4px 10px rgba(0,0,0,0.08);
+            ">
+                <div style="font-size:20px; font-weight:800; color:#0f172a;">
+                    🧑‍⚕️ {r['Doctor Name']}
+                </div>
+
+                <div style="margin-top:6px;">
+                    🩺 <b>Speciality:</b> {r['Speciality']}
+                </div>
+
+                <div>
+                    ⏰ <b>Consultation Time:</b> {r['Consultation Time']}
+                </div>
+
+                <div>
+                    📅 <b>Available Days:</b> {r['Available days']}
+                </div>
+
+                <div>
+                    📍 <b>Location:</b> {r['Location']}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
         )
 
 # ===============================
-# CHATBOT
+# CHATBOT TAB
 # ===============================
 elif menu == "💬 Chatbot":
-    st.subheader("💬 Ask me anything")
 
-    if "history" not in st.session_state:
-        st.session_state.history = []
+    st.subheader("💬 Ask the Hospital Assistant")
 
-    user_input = st.text_input("Type your question")
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
 
-    if st.button("Send") and user_input:
-        response = run_chatbot_query(user_input)
-        st.session_state.history.append(("You", user_input))
-        st.session_state.history.append(("Bot", response))
+    user_input = st.text_input("Type your question here")
 
-    for role, msg in st.session_state.history:
+    if st.button("Send") and user_input.strip():
+        reply = run_chatbot_query(user_input)
+        st.session_state.chat_history.append(("You", user_input))
+        st.session_state.chat_history.append(("Bot", reply))
+
+    for role, msg in st.session_state.chat_history:
         if role == "You":
             st.markdown(f"🧑 **You:** {msg}")
         else:
             st.markdown(f"🤖 **Bot:** {msg}")
 
 # ===============================
-# APPOINTMENT BOOKING
+# BOOK APPOINTMENT TAB
 # ===============================
 elif menu == "📅 Book Appointment":
-    st.subheader("📅 Book Appointment")
 
-    patient = st.text_input("👤 Patient Name")
+    st.subheader("📅 Book an Appointment")
+
+    patient_name = st.text_input("👤 Patient Name")
 
     doctor = st.selectbox(
         "👨‍⚕️ Select Doctor",
         sorted(df["Doctor Name"].unique())
     )
 
-    # DATE PICKER
-    min_date = datetime.now().date()
-    max_date = min_date + timedelta(days=7)
+    # Date picker (no past dates)
+    today = datetime.now().date()
     date = st.date_input(
         "📆 Select Date",
-        min_value=min_date,
-        max_value=max_date
+        min_value=today,
+        max_value=today + timedelta(days=7)
     )
 
     day = date.strftime("%A").lower()
 
-    # TIME PICKER
+    # Time picker
     selected_time = st.time_input(
         "⏰ Select Time",
         value=time(9, 0)
@@ -131,12 +173,12 @@ elif menu == "📅 Book Appointment":
     time_str = selected_time.strftime("%I%p")
 
     if st.button("✅ Confirm Appointment"):
-        if not patient.strip():
-            st.error("❌ Enter patient name")
+        if not patient_name.strip():
+            st.error("❌ Please enter patient name")
         else:
             result = book_appointment(
                 doctor=doctor,
-                patient=patient,
+                patient=patient_name,
                 day=day,
                 time_str=time_str
             )
