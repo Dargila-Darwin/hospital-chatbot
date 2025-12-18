@@ -1,5 +1,5 @@
 import streamlit as st
-from datetime import datetime, time
+from datetime import datetime, date, time
 from chatbot import run_chatbot_query, extract_doctor_name, extract_day, book_appointment
 
 # ===============================
@@ -8,74 +8,81 @@ from chatbot import run_chatbot_query, extract_doctor_name, extract_day, book_ap
 st.set_page_config(
     page_title="PRS Hospital Chatbot Assistant",
     page_icon="🏥",
-    layout="centered"
+    layout="wide"
 )
 
 # ===============================
-# CUSTOM CSS (HOSPITAL THEME + BACKGROUND IMAGE + OVERLAY)
+# BACKGROUND IMAGE + STYLES
 # ===============================
-st.markdown(f"""
-<style>
-/* Background image with overlay */
-[data-testid="stAppViewContainer"] {{
-    background-image: linear-gradient(rgba(255,255,255,0.85), rgba(255,255,255,0.85)), url('hos-image.jpg');
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-}}
+st.markdown(
+    f"""
+    <style>
+    .stApp {{
+        background-image: url("hos-image.jpg");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+    }}
+    .header {{
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        background: rgba(255,255,255,0.9);
+        z-index: 1000;
+        padding: 15px 0;
+        border-bottom: 1px solid #ddd;
+        text-align: center;
+        font-size: 28px;
+        font-weight: bold;
+        color: #084298;
+    }}
+    .chat-container {{
+        margin-top: 80px;
+    }}
+    </style>
+    <div class="header">🏥 PRS Hospital Chatbot Assistant</div>
+    """,
+    unsafe_allow_html=True
+)
 
-/* Header */
-.header {{
-    position: fixed;
-    top: 0;
-    width: 100%;
-    background-color: rgba(255,255,255,0.95);
-    z-index: 9999;
-    padding: 15px 0;
-    border-bottom: 2px solid #0055AA;
-    text-align: center;
-    font-size: 28px;
-    font-weight: bold;
-    color: #0055AA;
-}}
+# ===============================
+# SIDEBAR
+# ===============================
+with st.sidebar:
+    st.title("🏥 PRS Hospital")
 
-/* Content spacing */
-.content {{
-    margin-top: 100px;
-}}
+    with st.expander("ℹ️ About"):
+        st.write(
+            "PRS Hospital, Thiruvananthapuram, has over 37 years of excellence "
+            "in multi-specialty healthcare and advanced medical services."
+        )
 
-/* Sidebar */
-[data-testid="stSidebar"] {{
-    background-color: #F5F5F5;
-    padding: 20px;
-}}
+    with st.expander("🩺 Specialities"):
+        specialities = [
+            "Cardiologist", "ENT", "Gastroenterologist", "Gynecologist",
+            "Nephrologist", "Neurologist", "Urologist", "Pulmonologist",
+            "Dermatologist", "Ophthalmologist", "Orthopaedician", "Oncologist",
+            "Pathologist", "Radiologist", "Psychiatrist", "Psychologist",
+            "Endocrinologist", "General Surgeon", "Paediatrician"
+        ]
 
-/* Chat bubbles */
-.user-bubble {{
-    background-color: rgba(220, 248, 198, 0.9);
-    color: #000;
-    padding: 10px 14px;
-    border-radius: 10px;
-    margin: 5px;
-    max-width: 70%;
-    align-self: flex-end;
-}}
+        for spec in specialities:
+            if st.button(spec, key=f"spec_{spec}"):
+                st.session_state.selected_speciality = spec
+                st.rerun()
 
-.assistant-bubble {{
-    background-color: rgba(241, 240, 240, 0.9);
-    color: #000;
-    padding: 10px 14px;
-    border-radius: 10px;
-    margin: 5px;
-    max-width: 70%;
-    align-self: flex-start;
-    white-space: pre-line;
-}}
-</style>
+    with st.expander("📍 Location"):
+        st.markdown(
+            "**PRS Hospital**  \n"
+            "Killipalam, Thiruvananthapuram, Kerala – 695002"
+        )
 
-<div class="header">🏥 PRS Hospital Chatbot Assistant</div>
-<div class="content"></div>
-""", unsafe_allow_html=True)
+    st.markdown("### 📞 Appointment Booking")
+    st.markdown("📞 +91 98765 43210")
+    st.markdown("📞 +91 96785 47645")
+    st.markdown("### ☎️ Emergency")
+    st.markdown("🚨 +91 95687 46574")
 
 # ===============================
 # SESSION STATE
@@ -96,55 +103,19 @@ if "selected_speciality" not in st.session_state:
     st.session_state.selected_speciality = None
 
 # ===============================
-# SIDEBAR
-# ===============================
-with st.sidebar:
-    st.title("🏥 PRS Hospital")
-
-    with st.expander("ℹ️ About"):
-        st.markdown("""
-        **PRS Hospital, Thiruvananthapuram**  
-        37+ years of excellence in healthcare with modern facilities.
-        """)
-
-    with st.expander("🩺 Specialities"):
-        specialities = [
-            "Cardiologist", "ENT", "Gastroenterologist", "Gynecologist",
-            "Nephrologist", "Neurologist", "Urologist", "Pulmonologist",
-            "Dermatologist", "Ophthalmologist", "Orthopaedician", "Oncologist",
-            "Pathologist", "Radiologist", "Psychiatrist", "Psychologist",
-            "Endocrinologist", "General Surgeon", "Paediatrician"
-        ]
-        for spec in specialities:
-            if st.button(spec, key=spec):
-                st.session_state.selected_speciality = spec
-                st.rerun()
-
-    with st.expander("📍 Location"):
-        st.markdown("""
-        **PRS Hospital**  
-        Killipalam, Thiruvananthapuram, Kerala – 695002
-        """)
-
-    st.markdown("### 📞 Appointment Booking")
-    st.markdown("📞 +91 98765 43210")
-    st.markdown("📞 +91 96785 47645")
-
-    st.markdown("### 🚨 Emergency")
-    st.markdown("🚨 +91 95687 46574")
-
-# ===============================
-# HELPERS
+# HELPER FUNCTIONS
 # ===============================
 def format_doctors_line_by_line(response):
-    lines = []
-    for line in response.split("\n"):
+    lines = response.split("\n")
+    formatted = ""
+    for line in lines:
         line = line.strip()
         if line:
-            if not line.startswith("👨‍⚕️"):
-                line = f"👨‍⚕️ {line}"
-            lines.append(line)
-    return "\n".join(lines)
+            formatted += f"👨‍⚕️ {line}\n"
+    return formatted
+
+def get_day_name(d):
+    return d.strftime("%A").lower()
 
 # ===============================
 # SPECIALITY CLICK HANDLER
@@ -153,30 +124,28 @@ if st.session_state.selected_speciality:
     spec = st.session_state.selected_speciality
     response = run_chatbot_query(f"{spec} doctors today")
     formatted = format_doctors_line_by_line(response)
-
     st.session_state.messages.append({
         "role": "assistant",
         "content": f"🩺 **{spec} Doctors Available Today:**\n\n{formatted}"
     })
-
     st.session_state.selected_speciality = None
     st.rerun()
 
 # ===============================
-# CHAT DISPLAY
+# DISPLAY CHAT
 # ===============================
 for msg in st.session_state.messages:
     if msg["role"] == "user":
         with st.chat_message("user"):
-            st.markdown(f'<div class="user-bubble">{msg["content"]}</div>', unsafe_allow_html=True)
+            st.markdown(msg["content"])
     else:
         with st.chat_message("assistant"):
-            st.markdown(f'<div class="assistant-bubble">{msg["content"]}</div>', unsafe_allow_html=True)
+            st.markdown(msg["content"])
 
 # ===============================
 # USER INPUT
 # ===============================
-user_input = st.chat_input("Ask about doctors, timings, availability, or book an appointment…")
+user_input = st.chat_input("Ask about doctors, availability, or book an appointment…")
 
 if user_input:
     st.session_state.messages.append({
@@ -187,7 +156,7 @@ if user_input:
     booking = st.session_state.booking
     reply = ""
 
-    # ---------- BOOK APPOINTMENT ----------
+    # ---------- BOOKING FLOW ----------
     if not booking["active"] and "book" in user_input.lower():
         doctor = extract_doctor_name(user_input)
         day = extract_day(user_input)
@@ -199,26 +168,25 @@ if user_input:
                 "doctor": doctor,
                 "day": day
             })
-            reply = f"📅 Booking appointment with **{doctor}**.\nPlease enter patient name."
+            reply = f"📅 Booking appointment with **{doctor}**.\nPlease tell your name."
 
     elif booking["active"] and not booking["patient"]:
         booking["patient"] = user_input.strip()
-        reply = "⏰ Enter preferred time (example: **10am**)."
+        reply = "⏰ Enter preferred time (example: **10AM**)"
 
     elif booking["active"] and not booking["time"]:
         try:
-            selected_time = datetime.strptime(user_input.strip(), "%I%p")
-            if not time(9, 0) <= selected_time.time() <= time(20, 0):
-                reply = "⛔ Appointments allowed only between 9 AM and 8 PM."
+            selected_time = datetime.strptime(user_input.strip(), "%I%p").time()
+            if not time(9, 0) <= selected_time <= time(20, 0):
+                reply = "⛔ Appointments allowed only between 9AM and 8PM."
             else:
-                booking["time"] = user_input.strip()
+                booking["time"] = selected_time.strftime("%I:%M %p")
                 reply = book_appointment(
                     booking["doctor"],
                     booking["patient"],
                     booking["day"] or datetime.now().strftime("%A"),
                     booking["time"]
                 )
-
                 # reset booking
                 st.session_state.booking = {
                     "active": False,
@@ -227,11 +195,9 @@ if user_input:
                     "patient": None,
                     "time": None
                 }
-
         except:
-            reply = "❌ Invalid format. Use example: 10am"
+            reply = "❌ Invalid format. Use **10AM**."
 
-    # ---------- NORMAL CHAT ----------
     else:
         response = run_chatbot_query(user_input)
         reply = format_doctors_line_by_line(response)
