@@ -1,4 +1,3 @@
-# app.py
 import streamlit as st
 import pandas as pd
 from datetime import datetime, date, time
@@ -8,7 +7,7 @@ from chatbot import run_chatbot_query, extract_doctor_name
 # PAGE CONFIG
 # ===============================
 st.set_page_config(
-    page_title="PRS Hospital Chatbot",
+    page_title="PRS Hospital Chatbot Assistant",
     page_icon="🏥",
     layout="centered"
 )
@@ -36,24 +35,23 @@ st.markdown("""
 }
 </style>
 
-<div class="header">🏥 PRS Hospital – Chatbot Assistant</div>
+<div class="header">🏥 PRS Hospital Chatbot Assistant</div>
 <div class="content"></div>
 """, unsafe_allow_html=True)
 
 # ===============================
-# SIDEBAR WITH EXPANDERS
+# SIDEBAR
 # ===============================
 with st.sidebar:
     st.title("🏥 PRS Hospital")
 
-    # About
     with st.expander("ℹ️ About"):
         st.write(
             "PRS Hospital, Thiruvananthapuram, has over 37 years of excellence "
             "in multi-specialty healthcare and advanced medical services."
         )
 
-    # Specialities
+    # Clickable Specialities
     with st.expander("🩺 Specialities"):
         specialities = [
             "Cardiologist", "ENT", "Gastroenterologist", "Gynecologist",
@@ -62,10 +60,12 @@ with st.sidebar:
             "Pathologist", "Radiologist", "Psychiatrist", "Psychologist",
             "Endocrinologist", "General Surgeon", "Paediatrician"
         ]
-        for spec in specialities:
-            st.markdown(f"- {spec}")
 
-    # Location
+        for spec in specialities:
+            if st.button(spec, key=f"spec_{spec}"):
+                st.session_state.selected_speciality = spec
+                st.rerun()
+
     with st.expander("📍 Location"):
         st.markdown("""
         **PRS Hospital**  
@@ -73,13 +73,10 @@ with st.sidebar:
         Thiruvananthapuram, Kerala – 695002
         """)
 
-    # Appointment Booking
     st.markdown("### 📞 Appointment Booking")
     st.markdown("📞 +91 98765 43210")
     st.markdown("📞 +91 96785 47645")
-    st.markdown("[📲 Call Hospital](tel:+919876543210)")
 
-    # Emergency
     st.markdown("### ☎️ Emergency")
     st.markdown("🚨 **+91 95687 46574**")
 
@@ -98,6 +95,9 @@ if "booking" not in st.session_state:
         "time": None
     }
 
+if "selected_speciality" not in st.session_state:
+    st.session_state.selected_speciality = None
+
 # ===============================
 # APPOINTMENT STORAGE
 # ===============================
@@ -111,12 +111,27 @@ if not pd.io.common.file_exists(APPT_FILE):
 
 def save_appointment(doc, patient, d, t):
     df = pd.read_csv(APPT_FILE)
-    slots = df[(df["Doctor Name"] == doc) & (df["Day"] == str(d))]
+
+    for col in ["Doctor Name", "Patient Name", "Day", "Time"]:
+        if col not in df.columns:
+            df[col] = ""
+
+    slots = df[
+        (df["Doctor Name"] == doc) &
+        (df["Day"] == str(d))
+    ]
 
     if len(slots) >= MAX_SLOTS_PER_DOCTOR:
         return f"⛔ Slot full for **{doc}** on **{d}**."
 
-    df.loc[len(df)] = [doc, patient, str(d), t]
+    new_row = {
+        "Doctor Name": doc,
+        "Patient Name": patient,
+        "Day": str(d),
+        "Time": t
+    }
+
+    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
     df.to_csv(APPT_FILE, index=False)
 
     return (
@@ -126,6 +141,34 @@ def save_appointment(doc, patient, d, t):
         f"📅 Date: **{d}**\n"
         f"⏰ Time: **{t}**"
     )
+
+def get_available_slots(doctor_name, d):
+    df = pd.read_csv(APPT_FILE)
+    booked = df[
+        (df["Doctor Name"] == doctor_name) &
+        (df["Day"] == str(d))
+    ]
+    return MAX_SLOTS_PER_DOCTOR - len(booked)
+
+# ===============================
+# SPECIALITY AUTO RESPONSE
+# ===============================
+if st.session_state.selected_speciality:
+    spec = st.session_state.selected_speciality
+    response = run_chatbot_query(f"list {spec} doctors")
+
+    formatted = ""
+    for line in response.split("\n"):
+        if line.strip():
+            formatted += f"• {line.strip()}\n"
+
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": f"🩺 **{spec} Doctors Available:**\n\n{formatted}"
+    })
+
+    st.session_state.selected_speciality = None
+    st.rerun()
 
 # ===============================
 # CHAT DISPLAY
@@ -138,7 +181,7 @@ for msg in st.session_state.messages:
 # USER INPUT
 # ===============================
 user_input = st.chat_input(
-    "Ask about doctors, availability, degree, location, or book appointment"
+    "Ask about doctors, availability, or book an appointment"
 )
 
 if user_input:
@@ -149,36 +192,33 @@ if user_input:
     booking = st.session_state.booking
     reply = None
 
-    # ---------- BOOKING FLOW ----------
-    if booking["step"] is not None:
-        if booking["step"] == "patient":
-            booking["patient"] = user_input.strip()
-            booking["step"] = "date"
-            reply = "📆 Please select appointment date below."
-        else:
-            reply = "⚠️ Please complete the appointment booking steps below."
+    if booking["step"] == "patient":
+        booking["patient"] = user_input.strip()
+        booking["step"] = "date"
+        reply = "📆 Please select appointment date below."
 
     elif "book" in user_input.lower():
         doctor = extract_doctor_name(user_input)
         if not doctor:
-            reply = "Please mention the doctor name to book an appointment."
+            reply = "Please mention the doctor name."
         else:
             booking["doctor"] = doctor
             booking["step"] = "patient"
-            reply = f"📅 Booking appointment with **{doctor}**.\nPlease enter patient name."
+            reply = f"📅 Booking appointment with **{doctor}**.\nEnter patient name."
 
     else:
-        # Run chatbot query
         response = run_chatbot_query(user_input)
 
-        # If the response includes multiple doctors, split line by line
-        if "\n" in response:
-            response_lines = response.split("\n")
-            reply = ""
-            for line in response_lines:
-                reply += f"{line}\n"
-        else:
-            reply = response
+        doctor = extract_doctor_name(user_input)
+        if doctor:
+            today = date.today()
+            slots = get_available_slots(doctor, today)
+            response += f"\n\n📅 **Available slots today ({today})**: {slots}/{MAX_SLOTS_PER_DOCTOR}"
+
+        reply = ""
+        for line in response.split("\n"):
+            if line.strip():
+                reply += f"• {line.strip()}\n"
 
     st.session_state.messages.append(
         {"role": "assistant", "content": reply}
@@ -186,7 +226,7 @@ if user_input:
     st.rerun()
 
 # ===============================
-# CALENDAR & TIME PICKER
+# DATE & TIME PICKER
 # ===============================
 booking = st.session_state.booking
 
@@ -201,10 +241,7 @@ if booking["step"] == "date":
         st.rerun()
 
 if booking["step"] == "time":
-    selected_time = st.time_input(
-        "Select Time",
-        value=time(9, 0)
-    )
+    selected_time = st.time_input("Select Time", value=time(9, 0))
 
     if st.button("Confirm Time"):
         combined = datetime.combine(booking["date"], selected_time)
@@ -220,10 +257,11 @@ if booking["step"] == "time":
                 booking["date"],
                 selected_time.strftime("%I:%M %p")
             )
+
             st.session_state.messages.append(
                 {"role": "assistant", "content": result}
             )
-            # Reset booking
+
             st.session_state.booking = {
                 "step": None,
                 "doctor": None,
