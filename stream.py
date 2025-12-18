@@ -12,10 +12,11 @@ from chatbot import (
 # PAGE CONFIG
 # ===============================
 st.set_page_config(
-    page_title="PRS Hospital Chatbot Assistant",
+    page_title="PRS Hospital Chatbot",
     page_icon="🏥",
     layout="centered"
 )
+
 
 # ===============================
 # STICKY CENTERED HEADER
@@ -230,3 +231,4 @@ if booking["step"] == "time":
                 "date": None
             }
             st.rerun()
+
