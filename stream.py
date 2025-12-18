@@ -1,30 +1,34 @@
 import streamlit as st
-from datetime import datetime
+from datetime import datetime, time, timedelta
+import pandas as pd
+
 from chatbot import (
     run_chatbot_query,
     extract_doctor_name,
     extract_day,
-    book_appointment
+    match_specialty,
+    book_appointment,
+    df
 )
 
 # ===============================
 # PAGE CONFIG
 # ===============================
 st.set_page_config(
-    page_title="PRS Hospital Chatbot",
+    page_title="PRS Hospital Assistant",
     page_icon="🏥",
     layout="centered"
 )
 
 # ===============================
-# TITLE (FIXED AT TOP)
+# FIXED HEADER
 # ===============================
 st.markdown(
     """
-    <h1 style="text-align:center; color:#084298;">
-        🏥 PRS Hospital – Chatbot Assistant
+    <h1 style='text-align:center; position:sticky; top:0; background:#0f172a;
+    color:white; padding:12px; border-radius:8px; z-index:999'>
+    🏥 PRS Hospital Assistant Chatbot
     </h1>
-    <hr>
     """,
     unsafe_allow_html=True
 )
@@ -32,121 +36,112 @@ st.markdown(
 # ===============================
 # SIDEBAR
 # ===============================
-with st.sidebar.expander("ℹ️ About"):
-    st.markdown("""
-    **PRS Hospital, Trivandrum**  
-    37+ years of excellence in healthcare with modern facilities.
-    """)
+st.sidebar.title("📌 PRS Hospital")
 
-with st.sidebar.expander("🩺 Specialities"):
-    st.markdown("""
-    - Cardiologist  
-    - ENT  
-    - Gastroenterologist  
-    - Gynecologist  
-    - Nephrologist  
-    - Neurologist  
-    - Urologist  
-    - Pulmonologist  
-    - Dermatologist  
-    - Ophthalmologist  
-    - Orthopaedician  
-    - Oncologist  
-    - Pathologist  
-    - Radiologist  
-    - Psychiatrist  
-    - Psychologist  
-    - Endocrinologist  
-    - General Surgeon  
-    - Paediatrician  
-    """)
-
-with st.sidebar.expander("📍 Location"):
-    st.markdown("""
-    **PRS Hospital**  
-    Killipalam,  
-    Thiruvananthapuram,  
-    Kerala – 695002
-    """)
-# Appointment Booking Section (clickable)
-st.sidebar.subheader("📅 Appointment Booking")
-appointment_numbers = [
-    "+91 9876543210",
-    "+91 9678547645",
-    "+91 9234765840"
-]
-for num in appointment_numbers:
-    st.sidebar.markdown(f"📞 {num}")
-    st.sidebar.markdown(f"[Call {num}](tel:{num.replace(' ', '')})")
-
-# Emergency Contact Section (non-clickable)
-st.sidebar.subheader("🚨 Emergency Numbers")
-emergency_numbers = [
-    "+91 9678768843",
-    "+91 9568746574"
-]
-for num in emergency_numbers:
-    st.sidebar.markdown(f"⚠️ **{num}**")
-
-# General Contact Numbers (non-clickable)
-st.sidebar.subheader("📞 General Contact Numbers")
-general_numbers = [
-    "+91 9448123456",
-    "+91 9448234567"
-]
-for num in general_numbers:
-    st.sidebar.markdown(f"📱 {num}")
-
-# SESSION STATE
-# ===============================
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-if "booking" not in st.session_state:
-    st.session_state.booking = {
-        "active": False,
-        "doctor": None,
-        "day": None,
-        "patient": None,
-        "time": None
-    }
-
-# ===============================
-
-# CHAT HISTORY
-# ===============================
-for msg in st.session_state.messages:
-    if msg["role"] == "user":
-        with st.chat_message("user"):
-            st.markdown(f'''
-                <div style="
-                    text-align: right;
-                    background-color: #DCF8C6;
-                    padding: 10px;
-                    border-radius: 10px;
-                    margin: 5px;
-                    display: inline-block;
-                ">{msg["content"]}</div>
-            ''', unsafe_allow_html=True)
-    else:
-        with st.chat_message("assistant"):
-            st.markdown(f'''
-                <div style="
-                    text-align: left;
-                    background-color: #F1F0F0;
-                    padding: 10px;
-                    border-radius: 10px;
-                    margin: 5px;
-                    display: inline-block;
-                    white-space: pre-line;
-                ">{msg["content"]}</div>
-            ''', unsafe_allow_html=True)
-
-# ===============================
-# INPUT
-# ===============================
-user_input = st.chat_input(
-    "Ask about doctors, timings, availability, or book an appointment…"
+menu = st.sidebar.radio(
+    "Navigate",
+    ["💬 Chatbot", "📅 Book Appointment", "👨‍⚕️ Doctors", "ℹ️ About"]
 )
 
+# ===============================
+# ABOUT
+# ===============================
+if menu == "ℹ️ About":
+    st.info(
+        """
+        **PRS Hospital – Thiruvananthapuram**
 
+        ✔ Multi-specialty hospital  
+        ✔ Expert doctors  
+        ✔ 9 AM – 8 PM consultations  
+        ✔ Easy appointment booking
+        """
+    )
+
+# ===============================
+# DOCTOR LIST
+# ===============================
+elif menu == "👨‍⚕️ Doctors":
+    st.subheader("👨‍⚕️ Our Doctors")
+
+    for _, r in df.iterrows():
+        st.markdown(
+            f"""
+            **{r['Doctor Name']}**  
+            🩺 {r['Speciality']}  
+            ⏰ {r['Consultation Time']}  
+            📅 {r['Available days']}  
+            📍 {r['Location']}
+            ---
+            """
+        )
+
+# ===============================
+# CHATBOT
+# ===============================
+elif menu == "💬 Chatbot":
+    st.subheader("💬 Ask me anything")
+
+    if "history" not in st.session_state:
+        st.session_state.history = []
+
+    user_input = st.text_input("Type your question")
+
+    if st.button("Send") and user_input:
+        response = run_chatbot_query(user_input)
+        st.session_state.history.append(("You", user_input))
+        st.session_state.history.append(("Bot", response))
+
+    for role, msg in st.session_state.history:
+        if role == "You":
+            st.markdown(f"🧑 **You:** {msg}")
+        else:
+            st.markdown(f"🤖 **Bot:** {msg}")
+
+# ===============================
+# APPOINTMENT BOOKING
+# ===============================
+elif menu == "📅 Book Appointment":
+    st.subheader("📅 Book Appointment")
+
+    patient = st.text_input("👤 Patient Name")
+
+    doctor = st.selectbox(
+        "👨‍⚕️ Select Doctor",
+        sorted(df["Doctor Name"].unique())
+    )
+
+    # DATE PICKER
+    min_date = datetime.now().date()
+    max_date = min_date + timedelta(days=7)
+    date = st.date_input(
+        "📆 Select Date",
+        min_value=min_date,
+        max_value=max_date
+    )
+
+    day = date.strftime("%A").lower()
+
+    # TIME PICKER
+    selected_time = st.time_input(
+        "⏰ Select Time",
+        value=time(9, 0)
+    )
+
+    time_str = selected_time.strftime("%I%p")
+
+    if st.button("✅ Confirm Appointment"):
+        if not patient.strip():
+            st.error("❌ Enter patient name")
+        else:
+            result = book_appointment(
+                doctor=doctor,
+                patient=patient,
+                day=day,
+                time_str=time_str
+            )
+
+            if result.startswith("✅"):
+                st.success(result)
+            else:
+                st.error(result)
