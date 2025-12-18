@@ -77,13 +77,8 @@ with st.sidebar.expander("🩺 Specialities"):
     - Paediatrician  
     """)
 
-# Appointment Booking Section
 st.sidebar.subheader("📅 Appointment Booking")
-appointment_numbers = [
-    "+91 9876543210",
-    "+91 9678547645",
-    "+91 9234765840"
-]
+appointment_numbers = ["+91 9876543210", "+91 9678547645", "+91 9234765840"]
 for num in appointment_numbers:
     st.sidebar.markdown(f"📞 {num}")
     st.sidebar.markdown(f"[Call {num}](tel:{num.replace(' ', '')})")
@@ -176,14 +171,26 @@ if user_input:
         booking["patient"] = user_input.strip()
         reply = "📆 Select appointment date (calendar will appear)."
 
+    # ---------- WAITING FOR DATE/TIME ----------
+    elif booking["active"]:
+        reply = "⏰ Please select appointment date and time from the picker below."
+
     # ---------- NORMAL CHAT (BERT-based) ----------
     else:
         reply = run_chatbot_query(user_input)
+        # Reset any stale booking info if user asks unrelated query
+        st.session_state.booking = {
+            "active": False,
+            "doctor": None,
+            "patient": None,
+            "date": None,
+            "time": None
+        }
 
     st.session_state.messages.append({"role": "assistant", "content": reply})
 
 # ===============================
-# DATE PICKER (after patient name)
+# DATE PICKER
 # ===============================
 booking = st.session_state.booking
 if booking["active"] and booking.get("patient") and booking.get("date") is None:
@@ -199,16 +206,16 @@ if booking["active"] and booking.get("patient") and booking.get("date") is None:
         })
 
 # ===============================
-# TIME PICKER (after date)
+# TIME PICKER
 # ===============================
 if booking["active"] and booking.get("date") and booking.get("time") is None:
     selected_time = st.time_input(
         "Select appointment time:",
-        value=time(9, 0)  # Default start time
+        value=time(9, 0)  # default start time
     )
 
     if selected_time:
-        # Ensure time is within allowed slot
+        # Validate time slot
         if not time(9, 0) <= selected_time <= time(20, 0):
             st.warning("⛔ Appointments allowed only between 9:00 AM and 8:00 PM.")
         else:
@@ -242,6 +249,11 @@ if booking["active"] and booking.get("date") and booking.get("time") is None:
                             f"✅ Appointment confirmed with **{booking['doctor']}** on "
                             f"**{booking['date']}** at **{selected_time.strftime('%I:%M %p')}**."
                         )
+                        # Reset booking
                         st.session_state.booking = {
-                            "active": False, "doctor": None, "patient": None, "date": None, "time": None
+                            "active": False,
+                            "doctor": None,
+                            "patient": None,
+                            "date": None,
+                            "time": None
                         }
