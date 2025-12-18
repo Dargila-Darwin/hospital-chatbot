@@ -1,10 +1,12 @@
 import streamlit as st
 import pandas as pd
-from datetime import date, time
+from datetime import date, time, datetime
 from chatbot import (
     run_chatbot_query,
     extract_doctor_name,
-    df,
+    extract_day,
+    book_appointment,
+    df,  # dataframe with doctor info
     is_available_on,
     is_time_within_slot
 )
@@ -34,7 +36,7 @@ st.markdown(
 # ===============================
 # SIDEBAR
 # ===============================
-st.sidebar.title("🏥 PRS Hospital")
+st.sidebar.title("🏥 Hospital Dashboard")
 
 with st.sidebar.expander("ℹ️ About"):
     st.markdown("""
@@ -42,35 +44,37 @@ with st.sidebar.expander("ℹ️ About"):
     37+ years of excellence in healthcare with modern facilities.
     """)
 
+with st.sidebar.expander("🩺 Specialities"):
+    specialties = [
+        "Cardiologist",
+        "ENT",
+        "Gastroenterologist",
+        "Gynecologist",
+        "Nephrologist",
+        "Neurologist",
+        "Urologist",
+        "Pulmonologist",
+        "Dermatologist",
+        "Ophthalmologist",
+        "Orthopaedician",
+        "Oncologist",
+        "Pathologist",
+        "Radiologist",
+        "Psychiatrist",
+        "Psychologist",
+        "Endocrinologist",
+        "General Surgeon",
+        "Paediatrician"
+    ]
+    for spec in specialties:
+        st.markdown(f"- {spec}")
+
 with st.sidebar.expander("📍 Location"):
     st.markdown("""
     **PRS Hospital**  
     Killipalam,  
     Thiruvananthapuram,  
     Kerala – 695002
-    """)
-
-with st.sidebar.expander("🩺 Specialities"):
-    st.markdown("""
-    - Cardiologist  
-    - ENT  
-    - Gastroenterologist  
-    - Gynecologist  
-    - Nephrologist  
-    - Neurologist  
-    - Urologist  
-    - Pulmonologist  
-    - Dermatologist  
-    - Ophthalmologist  
-    - Orthopaedician  
-    - Oncologist  
-    - Pathologist  
-    - Radiologist  
-    - Psychiatrist  
-    - Psychologist  
-    - Endocrinologist  
-    - General Surgeon  
-    - Paediatrician  
     """)
 
 st.sidebar.subheader("📅 Appointment Booking")
@@ -114,19 +118,21 @@ except FileNotFoundError:
     appointments_df = pd.DataFrame(columns=["Doctor", "Patient", "Day", "Time"])
 
 # ===============================
-# CHAT HISTORY DISPLAY
+# CHAT HISTORY
 # ===============================
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
 # ===============================
-# USER INPUT
+# INPUT
 # ===============================
-user_input = st.chat_input("Ask about doctors, speciality, day, availability, or book an appointment…")
+user_input = st.chat_input("Ask about doctors, timings, availability, or book an appointment…")
 
+# ===============================
+# CHAT + BOOKING LOGIC
+# ===============================
 if user_input:
-    # Add user message
     st.session_state.messages.append({"role": "user", "content": user_input})
     booking = st.session_state.booking
     reply = ""
@@ -140,84 +146,64 @@ if user_input:
             booking.update({"active": True, "doctor": doctor})
             reply = f"📅 Booking appointment with **{doctor}**.\nPlease enter patient name."
 
-    # ---------- PATIENT NAME ----------
     elif booking["active"] and not booking["patient"]:
         booking["patient"] = user_input.strip()
         reply = "📆 Select appointment date (calendar will appear)."
 
-    # ---------- WAITING FOR DATE/TIME ----------
-    elif booking["active"]:
-        reply = "⏰ Please select appointment date and time from the picker below."
+    elif booking["active"] and booking.get("patient") and booking.get("date") is None:
+        selected_date = st.date_input("Select appointment date:", min_value=date.today())
+        if selected_date:
+            booking["date"] = selected_date
+            reply = "⏰ Select appointment time (picker will appear)."
+
+    elif booking["active"] and booking.get("date") and booking.get("time") is None:
+        selected_time = st.time_input("Select appointment time:", value=time(9, 0))
+        if selected_time:
+            if not time(9, 0) <= selected_time <= time(20, 0):
+                reply = "⛔ Appointments allowed only between 9 AM and 8 PM."
+            else:
+                booking_day_name = booking["date"].strftime("%A").lower()
+                doctor_row = df[df["Doctor Name"].str.contains(booking["doctor"], case=False)]
+                if doctor_row.empty:
+                    reply = f"❌ Doctor {booking['doctor']} not found."
+                else:
+                    doctor_row = doctor_row.iloc[0]
+                    if not is_available_on(booking_day_name, doctor_row["Available days"]):
+                        reply = f"❌ {booking['doctor']} is not available on {booking_day_name.capitalize()}."
+                    elif not is_time_within_slot(doctor_row["Consultation Time"], selected_time):
+                        reply = (f"❌ {booking['doctor']} is not available at "
+                                 f"{selected_time.strftime('%I:%M %p')}. "
+                                 f"Consultation hours: {doctor_row['Consultation Time']}.")
+                    else:
+                        new_entry = pd.DataFrame([{
+                            "Doctor": booking["doctor"],
+                            "Patient": booking["patient"],
+                            "Day": booking_day_name.capitalize(),
+                            "Time": selected_time.strftime("%I:%M %p")
+                        }])
+                        appointments_df = pd.concat([appointments_df, new_entry], ignore_index=True)
+                        appointments_df.to_csv(APPOINTMENTS_FILE, index=False)
+                        reply = (f"✅ Appointment confirmed with **{booking['doctor']}** on "
+                                 f"**{booking['date']}** at **{selected_time.strftime('%I:%M %p')}**.")
+                        # Reset booking
+                        st.session_state.booking = {
+                            "active": False,
+                            "doctor": None,
+                            "patient": None,
+                            "date": None,
+                            "time": None
+                        }
 
     # ---------- NORMAL CHAT ----------
     else:
-        reply = run_chatbot_query(user_input)
-        # Reset booking if unrelated query
-        st.session_state.booking = {
-            "active": False,
-            "doctor": None,
-            "patient": None,
-            "date": None,
-            "time": None
-        }
-
-    # Add assistant reply
-    st.session_state.messages.append({"role": "assistant", "content": reply})
-
-# ===============================
-# DATE PICKER
-# ===============================
-booking = st.session_state.booking
-if booking["active"] and booking.get("patient") and booking.get("date") is None:
-    selected_date = st.date_input("Select appointment date:", min_value=date.today())
-    if selected_date:
-        booking["date"] = selected_date
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": "⏰ Select appointment time (picker will appear):"
-        })
-
-# ===============================
-# TIME PICKER
-# ===============================
-if booking["active"] and booking.get("date") and booking.get("time") is None:
-    selected_time = st.time_input("Select appointment time:", value=time(9, 0))
-
-    if selected_time:
-        if not time(9, 0) <= selected_time <= time(20, 0):
-            st.warning("⛔ Appointments allowed only between 9:00 AM and 8:00 PM.")
-        else:
-            booking_day_name = booking["date"].strftime("%A").lower()
-            doctor_row = df[df["Doctor Name"].str.contains(booking["doctor"], case=False)]
-            if doctor_row.empty:
-                st.warning(f"❌ Doctor {booking['doctor']} not found.")
+        # Example: if user asks "heart doctors"
+        if "heart" in user_input.lower():
+            cardiologists = df[df["Specialty"].str.contains("Cardiologist", case=False)]["Doctor Name"].tolist()
+            if cardiologists:
+                reply = "👨‍⚕️ Available heart doctors:\n" + "\n".join(f"- {doc}" for doc in cardiologists)
             else:
-                doctor_row = doctor_row.iloc[0]
-                if not is_available_on(booking_day_name, doctor_row["Available days"]):
-                    st.warning(f"❌ {booking['doctor']} is not available on {booking_day_name.capitalize()}.")
-                elif not is_time_within_slot(doctor_row["Consultation Time"], selected_time):
-                    st.warning(
-                        f"❌ {booking['doctor']} is not available at {selected_time.strftime('%I:%M %p')}. "
-                        f"Consultation hours: {doctor_row['Consultation Time']}."
-                    )
-                else:
-                    new_entry = pd.DataFrame([{
-                        "Doctor": booking["doctor"],
-                        "Patient": booking["patient"],
-                        "Day": booking_day_name.capitalize(),
-                        "Time": selected_time.strftime("%I:%M %p")
-                    }])
-                    appointments_df = pd.concat([appointments_df, new_entry], ignore_index=True)
-                    appointments_df.to_csv(APPOINTMENTS_FILE, index=False)
-                    st.success(
-                        f"✅ Appointment confirmed with **{booking['doctor']}** on "
-                        f"**{booking['date']}** at **{selected_time.strftime('%I:%M %p')}**."
-                    )
-                    # Reset booking
-                    st.session_state.booking = {
-                        "active": False,
-                        "doctor": None,
-                        "patient": None,
-                        "date": None,
-                        "time": None
-                    }
+                reply = "❌ No cardiologists found."
+        else:
+            reply = run_chatbot_query(user_input)
+
+    st.session_state.messages.append({"role": "assistant", "content": reply})
