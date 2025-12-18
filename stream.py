@@ -12,11 +12,10 @@ from chatbot import (
 # PAGE CONFIG
 # ===============================
 st.set_page_config(
-    page_title="PRS Hospital Chatbot",
+    page_title="PRS Hospital Chatbot Assistant",
     page_icon="🏥",
     layout="centered"
 )
-
 
 # ===============================
 # STICKY CENTERED HEADER
@@ -104,18 +103,22 @@ if "selected_speciality" not in st.session_state:
     st.session_state.selected_speciality = None
 
 # ===============================
-# HELPER
+# HELPERS
 # ===============================
 def get_day_name(d):
     return d.strftime("%A").lower()
 
 def format_doctors_line_by_line(response):
+    """
+    Formats a multi-doctor response line by line with bullet points
+    """
+    lines = response.strip().split("\n")
     formatted = ""
-    parts = response.replace("•", "\n").split("\n")
-    for p in parts:
-        p = p.strip()
-        if p:
-            formatted += f"👨‍⚕️ {p}\n"
+    for line in lines:
+        line = line.strip()
+        if line:
+            # Add doctor icon + line
+            formatted += f"👨‍⚕️ {line}\n"
     return formatted
 
 # ===============================
@@ -231,4 +234,3 @@ if booking["step"] == "time":
                 "date": None
             }
             st.rerun()
-
