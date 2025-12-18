@@ -197,7 +197,8 @@ if not os.path.exists(appointments_file):
     ).to_csv(appointments_file, index=False)
 
 def book_appointment(doctor, patient, day, time_str):
-    row = df[df["Doctor Name"].str.contains(re.escape(doctor), case=False)]
+    row = df[df["Doctor Name"].str.lower() == doctor.lower()]
+
     if row.empty:
         return "❌ Doctor not found."
 
@@ -273,5 +274,6 @@ def chatbot_response(query):
 # ===============================
 def run_chatbot_query(query):
     return chatbot_response(query)
+
 
 
