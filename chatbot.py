@@ -193,7 +193,7 @@ def is_time_within_slot(consult_time, booking_time):
 appointments_file = "appointments.csv"
 if not os.path.exists(appointments_file):
     pd.DataFrame(
-        columns=["Doctor", "Patient", "Day", "Time"]
+        columns=["Doctor Name", "Patient Name", "Day", "Time"]   
     ).to_csv(appointments_file, index=False)
 
 def book_appointment(doctor, patient, day, time_str):
@@ -273,4 +273,5 @@ def chatbot_response(query):
 # ===============================
 def run_chatbot_query(query):
     return chatbot_response(query)
+
 
