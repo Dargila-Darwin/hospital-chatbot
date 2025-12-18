@@ -6,7 +6,6 @@ from chatbot import (
     extract_day,
     book_appointment
 )
-
 # ===============================
 # PAGE CONFIG
 # ===============================
@@ -99,8 +98,7 @@ general_numbers = [
 ]
 for num in general_numbers:
     st.sidebar.markdown(f"📱 {num}")
-
-# ===============================
+===============================
 # SESSION STATE
 # ===============================
 if "messages" not in st.session_state:
@@ -114,7 +112,6 @@ if "booking" not in st.session_state:
         "patient": None,
         "time": None
     }
-
 # ===============================
 # CHAT HISTORY
 # ===============================
@@ -151,7 +148,6 @@ for msg in st.session_state.messages:
 user_input = st.chat_input(
     "Ask about doctors, timings, availability, or book an appointment…"
 )
-
 # ===============================
 # CHAT + BOOKING LOGIC
 # ===============================
@@ -162,12 +158,10 @@ if user_input:
     })
 
     booking = st.session_state.booking
-
     # ---------- BOOK APPOINTMENT ----------
     if not booking["active"] and "book" in user_input.lower():
         doctor = extract_doctor_name(user_input)
         day = extract_day(user_input)
-
         if not doctor:
             reply = "👨⚕️ Please specify the doctor's name to book an appointment."
         else:
@@ -176,25 +170,19 @@ if user_input:
                 "doctor": doctor,
                 "day": day
             })
-            reply = f"📅 Booking appointment with **{doctor}**.\nPlease tell your name."
+            reply = f"📅 Booking appointment with **{doctor}**.\nPlease enter patient name."
 
     elif booking["active"] and not booking["patient"]:
         booking["patient"] = user_input.strip()
-        reply = "⏰ Enter preferred time (example: **10am to 11am**)."
+        reply = "⏰ Enter preferred time (example: **10am**)."
 
     elif booking["active"] and not booking["time"]:
         try:
-            start, end = user_input.lower().split("to")
-            start_t = datetime.strptime(start.strip(), "%I%p")
-            end_t = datetime.strptime(end.strip(), "%I%p")
-
-            if (
-                start_t < datetime.strptime("9am", "%I%p")
-                or end_t > datetime.strptime("8pm", "%I%p")
-            ):
-                reply = "⛔ Appointments allowed only between **9am and 8pm**."
+            selected_time = datetime.strptime(user_input.strip(), "%I%p")
+            if not time(9, 0) <= selected_time.time() <= time(20, 0):
+                reply = "⛔ Appointments allowed only between 9 AM and 8 PM."
             else:
-                booking["time"] = user_input.lower()
+                booking["time"] = user_input.strip()
                 reply = book_appointment(
                     booking["doctor"],
                     booking["patient"],
@@ -212,8 +200,7 @@ if user_input:
                 }
 
         except:
-            reply = "❌ Invalid format. Use **10am to 11am**."
-
+            reply = "❌ Invalid format. Use example: 10am"
     # ---------- NORMAL CHAT ----------
     else:
         reply = run_chatbot_query(user_input)
