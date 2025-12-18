@@ -1,213 +1,245 @@
-import streamlit as st
-from datetime import datetime
-from chatbot import (
-    run_chatbot_query,
-    extract_doctor_name,
-    extract_day,
-    book_appointment
-)
 # ===============================
-# PAGE CONFIG
+# PRS HOSPITAL CHATBOT (FINAL – CORRECT)
+# BERT LOGIC UNTOUCHED ✅
 # ===============================
-st.set_page_config(
-    page_title="PRS Hospital Chatbot",
-    page_icon="🏥",
-    layout="centered"
-)
+
+import re
+import os
+import pandas as pd
+import torch
+import joblib
+from datetime import datetime, timedelta
+from transformers import BertTokenizer, BertForSequenceClassification
+import gdown
 
 # ===============================
-# TITLE (FIXED AT TOP)
+# MODEL DOWNLOAD
 # ===============================
-st.markdown(
-    """
-    <h1 style="text-align:center; color:#084298;">
-        🏥 PRS Hospital – Chatbot Assistant
-    </h1>
-    <hr>
-    """,
-    unsafe_allow_html=True
-)
+model_path = "./bert_doctor_classification"
+os.makedirs(model_path, exist_ok=True)
+
+model_file = os.path.join(model_path, "model.safetensors")
+if not os.path.exists(model_file):
+    file_id = "1-eUWEBYaDUoAySlAHkoIyIsIllinlu5Z"
+    gdown.download(f"https://drive.google.com/uc?id={file_id}", model_file, quiet=False)
 
 # ===============================
-# SIDEBAR
+# LOAD DATASET
 # ===============================
-st.sidebar.title("🏥 Hospital Dashboard")
+df = pd.read_csv("Hospital_Information124.csv")
 
-with st.sidebar.expander("ℹ️ About"):
-    st.markdown("""
-    **PRS Hospital, Trivandrum**  
-    37+ years of excellence in healthcare with modern facilities.
-    """)
+def norm(s):
+    return str(s).strip()
 
-with st.sidebar.expander("🩺 Specialities"):
-    st.markdown("""
-    - Cardiologist  
-    - ENT  
-    - Gastroenterologist  
-    - Gynecologist  
-    - Nephrologist  
-    - Neurologist  
-    - Urologist  
-    - Pulmonologist  
-    - Dermatologist  
-    - Ophthalmologist  
-    - Orthopaedician  
-    - Oncologist  
-    - Pathologist  
-    - Radiologist  
-    - Psychiatrist  
-    - Psychologist  
-    - Endocrinologist  
-    - General Surgeon  
-    - Paediatrician  
-    """)
-
-with st.sidebar.expander("📍 Location"):
-    st.markdown("""
-    **PRS Hospital**  
-    Killipalam,  
-    Thiruvananthapuram,  
-    Kerala – 695002
-    """)
-
-# Appointment Booking Section (clickable)
-st.sidebar.subheader("📅 Appointment Booking")
-appointment_numbers = [
-    "+91 9876543210",
-    "+91 9678547645",
-    "+91 9234765840"
-]
-for num in appointment_numbers:
-    st.sidebar.markdown(f"📞 {num}")
-    st.sidebar.markdown(f"[Call {num}](tel:{num.replace(' ', '')})")
-
-# Emergency Contact Section (non-clickable)
-st.sidebar.subheader("🚨 Emergency Numbers")
-emergency_numbers = [
-    "+91 9678768843",
-    "+91 9568746574"
-]
-for num in emergency_numbers:
-    st.sidebar.markdown(f"⚠️ **{num}**")
-
-# General Contact Numbers (non-clickable)
-st.sidebar.subheader("📞 General Contact Numbers")
-general_numbers = [
-    "+91 9448123456",
-    "+91 9448234567"
-]
-for num in general_numbers:
-    st.sidebar.markdown(f"📱 {num}")
-#===============================
-# SESSION STATE
-# ===============================
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-if "booking" not in st.session_state:
-    st.session_state.booking = {
-        "active": False,
-        "doctor": None,
-        "day": None,
-        "patient": None,
-        "time": None
-    }
-# ===============================
-# CHAT HISTORY
-# ===============================
-for msg in st.session_state.messages:
-    if msg["role"] == "user":
-        with st.chat_message("user"):
-            st.markdown(f'''
-                <div style="
-                    text-align: right;
-                    background-color: #DCF8C6;
-                    padding: 10px;
-                    border-radius: 10px;
-                    margin: 5px;
-                    display: inline-block;
-                ">{msg["content"]}</div>
-            ''', unsafe_allow_html=True)
-    else:
-        with st.chat_message("assistant"):
-            st.markdown(f'''
-                <div style="
-                    text-align: left;
-                    background-color: #F1F0F0;
-                    padding: 10px;
-                    border-radius: 10px;
-                    margin: 5px;
-                    display: inline-block;
-                    white-space: pre-line;
-                ">{msg["content"]}</div>
-            ''', unsafe_allow_html=True)
+for col in [
+    "Doctor Name", "Speciality", "Professional Degree",
+    "Consultation Time", "Available days",
+    "Contact", "Email", "Location"
+]:
+    df[col] = df[col].apply(norm)
 
 # ===============================
-# INPUT
+# LOAD BERT (UNCHANGED)
 # ===============================
-user_input = st.chat_input(
-    "Ask about doctors, timings, availability, or book an appointment…"
-)
+tokenizer = BertTokenizer.from_pretrained(model_path)
+model = BertForSequenceClassification.from_pretrained(model_path)
+label_encoder = joblib.load(os.path.join(model_path, "label_encoder.pkl"))
+
+def detect_intent(query):
+    inputs = tokenizer(query, return_tensors="pt", truncation=True, padding=True)
+    outputs = model(**inputs)
+    pred = torch.argmax(outputs.logits).item()
+    return label_encoder.inverse_transform([pred])[0]
+
 # ===============================
-# CHAT + BOOKING LOGIC
+# CONSTANTS
 # ===============================
-if user_input:
-    st.session_state.messages.append({
-        "role": "user",
-        "content": user_input
-    })
+SPECIALITY_SYNONYMS = {
+    "cardiologist": ["cardio", "heart", "cardiology", "interventional cardiologist", "chief cardiologist", "caardio"],
+    "ent": ["ear nose throat", "otolaryngology", "laryngology", "phonosurgery", "vertigo"],
+    "gastroenterologist": ["gastro", "digestive", "hepatology", "pediatric gastroenterology"],
+    "gynecologist": ["gyn", "obg", "obstetrics", "fertility"],
+    "nephrologist": ["kidney"],
+    "neurologist": ["neuro", "brain", "neurovascular", "stroke"],
+    "urologist": ["urinary", "genito-urinary"],
+    "pulmonologist": ["respiratory", "lungs", "tb"],
+    "dermatologist": ["skin"],
+    "ophthalmologist": ["eye"],
+    "orthopaedician": ["ortho", "orthopedic", "arthroscopy"],
+    "oncologist": ["cancer", "medical oncology", "surgical oncology", "clinical oncology"],
+    "pathologist": ["pathology"],
+    "radiologist": ["radiology", "radiodiagnosis", "interventional radiology"],
+    "psychiatrist": ["mental health", "psych","Psychiatrist"],
+    "psychologist": ["counseling"],
+    "endocrinologist": ["endocrine", "hormone"],
+    "general surgeon": ["gen surg", "surgery"],
+    "paediatrician": ["kids doctor", "paed", "pediatrician", "child doctor"],
 
-    booking = st.session_state.booking
-    # ---------- BOOK APPOINTMENT ----------
-    if not booking["active"] and "book" in user_input.lower():
-        doctor = extract_doctor_name(user_input)
-        day = extract_day(user_input)
-        if not doctor:
-            reply = "👨⚕️ Please specify the doctor's name to book an appointment."
-        else:
-            booking.update({
-                "active": True,
-                "doctor": doctor,
-                "day": day
-            })
-            reply = f"📅 Booking appointment with **{doctor}**.\nPlease enter patient name."
+}
 
-    elif booking["active"] and not booking["patient"]:
-        booking["patient"] = user_input.strip()
-        reply = "⏰ Enter preferred time (example: **10am**)."
+DAY_SYNONYMS = {
+    "monday": ["mon"], "tuesday": ["tue"],
+    "wednesday": ["wed"], "thursday": ["thu"],
+    "friday": ["fri"], "saturday": ["sat"],
+    "sunday": ["sun"]
+}
 
-    elif booking["active"] and not booking["time"]:
-        try:
-            selected_time = datetime.strptime(user_input.strip(), "%I%p")
-            if not time(9, 0) <= selected_time.time() <= time(20, 0):
-                reply = "⛔ Appointments allowed only between 9 AM and 8 PM."
-            else:
-                booking["time"] = user_input.strip()
-                reply = book_appointment(
-                    booking["doctor"],
-                    booking["patient"],
-                    booking["day"] or datetime.now().strftime("%A"),
-                    booking["time"]
-                )
+COLUMN_ALIASES = {
+    "Professional Degree": ["degree", "qualification"],
+    "Contact": ["contact", "phone", "mobile"],
+    "Location": ["location", "address"],
+    "Consultation Time": ["timing", "time", "hours"],
+}
 
-                # reset booking
-                st.session_state.booking = {
-                    "active": False,
-                    "doctor": None,
-                    "day": None,
-                    "patient": None,
-                    "time": None
-                }
+# ===============================
+# EXTRACTION HELPERS
+# ===============================
+def extract_doctor_name(text):
+    t = text.lower()
+    for name in df["Doctor Name"].unique():
+        if name.lower() in t:
+            return name
+    return None
 
-        except:
-            reply = "❌ Invalid format. Use example: 10am"
-    # ---------- NORMAL CHAT ----------
-    else:
-        reply = run_chatbot_query(user_input)
+def extract_day(text):
+    t = text.lower()
+    if "today" in t:
+        return datetime.now().strftime("%A").lower()
+    if "tomorrow" in t:
+        return (datetime.now() + timedelta(days=1)).strftime("%A").lower()
+    for d, syns in DAY_SYNONYMS.items():
+        if d in t or any(s in t for s in syns):
+            return d
+    return None
 
-    st.session_state.messages.append({
-        "role": "assistant",
-        "content": reply
-    })
+def match_specialty(text):
+    t = text.lower()
+    for spec in df["Speciality"].unique():
+        if spec.lower() in t:
+            return spec
+    for k, v in SPECIALITY_SYNONYMS.items():
+        if k in t or any(s in t for s in v):
+            return k
+    return None
 
-    st.rerun()
+def map_field(text):
+    t = text.lower()
+    for col, aliases in COLUMN_ALIASES.items():
+        if any(a in t for a in aliases):
+            return col
+    return None
+
+# ===============================
+# AVAILABILITY LOGIC (CORRECT)
+# ===============================
+def is_available_on(day, available_text):
+    if not day:
+        return True
+    txt = available_text.lower()
+    if "all days" in txt:
+        return True
+    if "not available" in txt:
+        return day not in txt
+    return True
+
+# ===============================
+# TIME PARSING (ROBUST)
+# ===============================
+def parse_time(t):
+    t = t.replace(".", ":").strip().upper()
+    try:
+        return datetime.strptime(t, "%I:%M%p").time()
+    except:
+        return datetime.strptime(t, "%I%p").time()
+
+def is_time_within_slot(consult_time, booking_time):
+    consult_time = consult_time.replace("–", "-")
+    start, end = consult_time.split("-")
+    return parse_time(start) <= booking_time <= parse_time(end)
+
+# ===============================
+# APPOINTMENT BOOKING
+# ===============================
+appointments_file = "appointments.csv"
+if not os.path.exists(appointments_file):
+    pd.DataFrame(
+        columns=["Doctor", "Patient", "Day", "Time"]
+    ).to_csv(appointments_file, index=False)
+
+def book_appointment(doctor, patient, day, time_str):
+    row = df[df["Doctor Name"].str.contains(re.escape(doctor), case=False)]
+    if row.empty:
+        return "❌ Doctor not found."
+
+    row = row.iloc[0]
+
+    if not is_available_on(day, row["Available days"]):
+        return f"❌ {doctor} is not available on {day.capitalize()}."
+
+    try:
+        booking_time = parse_time(time_str)
+    except:
+        return "❌ Invalid time format (use 10AM, 3PM)."
+
+    if not is_time_within_slot(row["Consultation Time"], booking_time):
+        return f"❌ Outside consultation hours ({row['Consultation Time']})."
+
+    appt_df = pd.read_csv(appointments_file)
+    appt_df.loc[len(appt_df)] = [doctor, patient, day.capitalize(), time_str.upper()]
+    appt_df.to_csv(appointments_file, index=False)
+
+    return f"✅ Appointment confirmed with **{doctor}** on **{day.capitalize()}** at **{time_str.upper()}**."
+
+# ===============================
+# RESPONSE BUILDERS
+# ===============================
+def availability_on_day_for_specialty(spec, day):
+    rows = df[df["Speciality"].str.lower().str.contains(spec.lower(), na=False)]
+    result = []
+    for _, r in rows.iterrows():
+        if is_available_on(day, r["Available days"]):
+            result.append(
+                f"👨‍⚕️ {r['Doctor Name']} ({r['Speciality']}) – {r['Consultation Time']}"
+            )
+    return "\n".join(result) if result else f"⚠️ No {spec} available on {day.capitalize()}."
+
+# ===============================
+# MAIN CHATBOT LOGIC
+# ===============================
+def chatbot_response(query):
+    intent = detect_intent(query)
+
+    doctor = extract_doctor_name(query)
+    day = extract_day(query)
+    specialty = match_specialty(query)
+    field = map_field(query)
+
+    if field == "Location":
+        return "📍 PRS Hospital, Killipalam, Thiruvananthapuram"
+
+    if doctor and field:
+        row = df[df["Doctor Name"] == doctor].iloc[0]
+        if field == "Contact":
+            return f"📞 {row['Contact']}\n📧 {row['Email']}"
+        return f"{doctor} {field.lower()}: {row[field]}"
+
+    if day and specialty:
+        return availability_on_day_for_specialty(specialty, day)
+
+    if intent == "find_doctor" and specialty:
+        today = datetime.now().strftime("%A").lower()
+        return availability_on_day_for_specialty(specialty, today)
+
+    return (
+        "🤖 I can help with:\n"
+        "• Doctor availability (today / tomorrow / specific day)\n"
+        "• Doctor details & qualifications\n"
+        "• Appointment booking\n"
+        "• Contact & hospital location"
+    )
+
+# ===============================
+# STREAMLIT ENTRY
+# ===============================
+def run_chatbot_query(query):
+    return chatbot_response(query)
