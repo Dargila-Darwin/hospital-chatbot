@@ -105,7 +105,7 @@ general_numbers = [
 ]
 for num in general_numbers:
     st.sidebar.markdown(f"📱 {num}")
-===============================
+#===============================
 
 
 # ===============================
@@ -248,3 +248,4 @@ if booking["active"] and booking.get("date") and booking.get("time") is None:
                     st.success(f"✅ Appointment confirmed with **{booking['doctor']}** on **{booking['date']}** at **{booking_time.strftime('%I:%M %p')}**.")
                     st.session_state.booking = {"active": False, "doctor": None, "patient": None, "date": None, "time": None}
                     st.experimental_rerun()
+
