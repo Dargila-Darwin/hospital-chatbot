@@ -146,11 +146,19 @@ def is_available_on(day, available_text):
 # TIME PARSING (ROBUST)
 # ===============================
 def parse_time(t):
-    t = t.replace(".", ":").strip().upper()
-    try:
-        return datetime.strptime(t, "%I:%M%p").time()
-    except:
-        return datetime.strptime(t, "%I%p").time()
+    """
+    Converts a string like '9 am', '9:30AM', '10.30AM', '2 PM' into datetime.time
+    """
+    if not t:
+        return None
+    t = t.replace(".", ":").strip().lower().replace(" ", "")  # remove spaces and dots
+    for fmt in ("%I:%M%p", "%I%p"):
+        try:
+            return datetime.strptime(t, fmt).time()
+        except:
+            continue
+    return None
+
 
 #def is_time_within_slot(consult_time, booking_time):
  #   consult_time = consult_time.replace("–", "-")
@@ -158,32 +166,29 @@ def parse_time(t):
    # return parse_time(start) <= booking_time <= parse_time(end)
 ##############################################################
 def is_time_within_slot(consult_time, booking_time):
-    if not consult_time:
+    """
+    Checks if the booking_time falls within the consult_time slot.
+    Handles formats like '9AM-1PM', '10.30AM to 2PM', '9 am to 2 pm'
+    """
+    if not consult_time or booking_time is None:
         return False
 
-    consult_time = str(consult_time).lower().strip()
-    consult_time = consult_time.replace("–", "-")
+    consult_time = str(consult_time).lower().replace("–", "-").replace(" to ", "-").strip()
 
-    # Case: "10.30AM to 2PM"
-    if "to" in consult_time:
-        parts = consult_time.split("to")
+    if "-" not in consult_time:
+        return False  # invalid format
 
-    # Case: "9AM-1PM"
-    elif "-" in consult_time:
-        parts = consult_time.split("-")
-
-    else:
-        return False  # invalid format like "On Call"
-
+    parts = consult_time.split("-")
     if len(parts) != 2:
         return False
 
-    try:
-        start = parse_time(parts[0].strip())
-        end = parse_time(parts[1].strip())
-        return start <= booking_time <= end
-    except:
+    start = parse_time(parts[0].strip())
+    end = parse_time(parts[1].strip())
+    if start is None or end is None:
         return False
+
+    return start <= booking_time <= end
+
 
 
 
@@ -274,6 +279,7 @@ def chatbot_response(query):
 # ===============================
 def run_chatbot_query(query):
     return chatbot_response(query)
+
 
 
 
