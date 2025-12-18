@@ -77,9 +77,7 @@ with st.sidebar.expander("🩺 Specialities"):
     - Paediatrician  
     """)
 
-# ===============================
-# APPOINTMENT CONTACTS (Sidebar)
-# ===============================
+# Appointment Booking Section
 st.sidebar.subheader("📅 Appointment Booking")
 appointment_numbers = [
     "+91 9876543210",
@@ -206,34 +204,44 @@ if booking["active"] and booking.get("patient") and booking.get("date") is None:
 if booking["active"] and booking.get("date") and booking.get("time") is None:
     selected_time = st.time_input(
         "Select appointment time:",
-        value=time(9, 0),
-        min_value=time(9, 0),
-        max_value=time(20, 0)
+        value=time(9, 0)  # Default start time
     )
+
     if selected_time:
-        booking_day_name = booking["date"].strftime("%A").lower()
-        doctor_row = df[df["Doctor Name"].str.contains(booking["doctor"], case=False)]
-        if doctor_row.empty:
-            st.warning(f"❌ Doctor {booking['doctor']} not found.")
+        # Ensure time is within allowed slot
+        if not time(9, 0) <= selected_time <= time(20, 0):
+            st.warning("⛔ Appointments allowed only between 9:00 AM and 8:00 PM.")
         else:
-            doctor_row = doctor_row.iloc[0]
-            # Check day availability
-            if not is_available_on(booking_day_name, doctor_row["Available days"]):
-                st.warning(f"❌ {booking['doctor']} is not available on {booking_day_name.capitalize()}.")
+            booking_day_name = booking["date"].strftime("%A").lower()
+            doctor_row = df[df["Doctor Name"].str.contains(booking["doctor"], case=False)]
+            if doctor_row.empty:
+                st.warning(f"❌ Doctor {booking['doctor']} not found.")
             else:
-                # Check time availability
-                booking_time = selected_time
-                if not is_time_within_slot(doctor_row["Consultation Time"], booking_time):
-                    st.warning(f"❌ {booking['doctor']} is not available at {booking_time.strftime('%I:%M %p')}. Consultation hours: {doctor_row['Consultation Time']}.")
+                doctor_row = doctor_row.iloc[0]
+                # Check doctor availability on selected day
+                if not is_available_on(booking_day_name, doctor_row["Available days"]):
+                    st.warning(f"❌ {booking['doctor']} is not available on {booking_day_name.capitalize()}.")
                 else:
-                    # Save appointment
-                    new_entry = pd.DataFrame([{
-                        "Doctor": booking["doctor"],
-                        "Patient": booking["patient"],
-                        "Day": booking_day_name.capitalize(),
-                        "Time": booking_time.strftime("%I:%M %p")
-                    }])
-                    appointments_df = pd.concat([appointments_df, new_entry], ignore_index=True)
-                    appointments_df.to_csv(APPOINTMENTS_FILE, index=False)
-                    st.success(f"✅ Appointment confirmed with **{booking['doctor']}** on **{booking['date']}** at **{booking_time.strftime('%I:%M %p')}**.")
-                    st.session_state.booking = {"active": False, "doctor": None, "patient": None, "date": None, "time": None}
+                    # Check time within consultation hours
+                    if not is_time_within_slot(doctor_row["Consultation Time"], selected_time):
+                        st.warning(
+                            f"❌ {booking['doctor']} is not available at {selected_time.strftime('%I:%M %p')}. "
+                            f"Consultation hours: {doctor_row['Consultation Time']}."
+                        )
+                    else:
+                        # Save appointment
+                        new_entry = pd.DataFrame([{
+                            "Doctor": booking["doctor"],
+                            "Patient": booking["patient"],
+                            "Day": booking_day_name.capitalize(),
+                            "Time": selected_time.strftime("%I:%M %p")
+                        }])
+                        appointments_df = pd.concat([appointments_df, new_entry], ignore_index=True)
+                        appointments_df.to_csv(APPOINTMENTS_FILE, index=False)
+                        st.success(
+                            f"✅ Appointment confirmed with **{booking['doctor']}** on "
+                            f"**{booking['date']}** at **{selected_time.strftime('%I:%M %p')}**."
+                        )
+                        st.session_state.booking = {
+                            "active": False, "doctor": None, "patient": None, "date": None, "time": None
+                        }
