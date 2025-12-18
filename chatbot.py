@@ -152,10 +152,40 @@ def parse_time(t):
     except:
         return datetime.strptime(t, "%I%p").time()
 
+#def is_time_within_slot(consult_time, booking_time):
+ #   consult_time = consult_time.replace("–", "-")
+  #  start, end = consult_time.split("-")
+   # return parse_time(start) <= booking_time <= parse_time(end)
+##############################################################
 def is_time_within_slot(consult_time, booking_time):
+    if not consult_time:
+        return False
+
+    consult_time = str(consult_time).lower().strip()
     consult_time = consult_time.replace("–", "-")
-    start, end = consult_time.split("-")
-    return parse_time(start) <= booking_time <= parse_time(end)
+
+    # Case: "10.30AM to 2PM"
+    if "to" in consult_time:
+        parts = consult_time.split("to")
+
+    # Case: "9AM-1PM"
+    elif "-" in consult_time:
+        parts = consult_time.split("-")
+
+    else:
+        return False  # invalid format like "On Call"
+
+    if len(parts) != 2:
+        return False
+
+    try:
+        start = parse_time(parts[0].strip())
+        end = parse_time(parts[1].strip())
+        return start <= booking_time <= end
+    except:
+        return False
+
+
 
 # ===============================
 # APPOINTMENT BOOKING
@@ -243,3 +273,4 @@ def chatbot_response(query):
 # ===============================
 def run_chatbot_query(query):
     return chatbot_response(query)
+
