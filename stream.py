@@ -77,7 +77,9 @@ with st.sidebar.expander("🩺 Specialities"):
     - Paediatrician  
     """)
 
-# Appointment Booking Section (clickable)
+# ===============================
+# APPOINTMENT CONTACTS (Sidebar)
+# ===============================
 st.sidebar.subheader("📅 Appointment Booking")
 appointment_numbers = [
     "+91 9876543210",
@@ -88,25 +90,15 @@ for num in appointment_numbers:
     st.sidebar.markdown(f"📞 {num}")
     st.sidebar.markdown(f"[Call {num}](tel:{num.replace(' ', '')})")
 
-# Emergency Contact Section (non-clickable)
 st.sidebar.subheader("🚨 Emergency Numbers")
-emergency_numbers = [
-    "+91 9678768843",
-    "+91 9568746574"
-]
+emergency_numbers = ["+91 9678768843", "+91 9568746574"]
 for num in emergency_numbers:
     st.sidebar.markdown(f"⚠️ **{num}**")
 
-# General Contact Numbers (non-clickable)
 st.sidebar.subheader("📞 General Contact Numbers")
-general_numbers = [
-    "+91 9448123456",
-    "+91 9448234567"
-]
+general_numbers = ["+91 9448123456", "+91 9448234567"]
 for num in general_numbers:
     st.sidebar.markdown(f"📱 {num}")
-#===============================
-
 
 # ===============================
 # SESSION STATE
@@ -191,7 +183,6 @@ if user_input:
         reply = run_chatbot_query(user_input)
 
     st.session_state.messages.append({"role": "assistant", "content": reply})
-    st.experimental_rerun()
 
 # ===============================
 # DATE PICKER (after patient name)
@@ -208,7 +199,6 @@ if booking["active"] and booking.get("patient") and booking.get("date") is None:
             "role": "assistant",
             "content": "⏰ Select appointment time (picker will appear):"
         })
-        st.experimental_rerun()
 
 # ===============================
 # TIME PICKER (after date)
@@ -247,5 +237,3 @@ if booking["active"] and booking.get("date") and booking.get("time") is None:
                     appointments_df.to_csv(APPOINTMENTS_FILE, index=False)
                     st.success(f"✅ Appointment confirmed with **{booking['doctor']}** on **{booking['date']}** at **{booking_time.strftime('%I:%M %p')}**.")
                     st.session_state.booking = {"active": False, "doctor": None, "patient": None, "date": None, "time": None}
-                    st.experimental_rerun()
-
