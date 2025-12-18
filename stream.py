@@ -96,6 +96,23 @@ general_numbers = [
 ]
 for num in general_numbers:
     st.sidebar.markdown(f"📱 {num}")
+
+# SESSION STATE
+# ===============================
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+if "booking" not in st.session_state:
+    st.session_state.booking = {
+        "active": False,
+        "doctor": None,
+        "day": None,
+        "patient": None,
+        "time": None
+    }
+
+# ===============================
+
 # CHAT HISTORY
 # ===============================
 for msg in st.session_state.messages:
@@ -131,4 +148,5 @@ for msg in st.session_state.messages:
 user_input = st.chat_input(
     "Ask about doctors, timings, availability, or book an appointment…"
 )
+
 
