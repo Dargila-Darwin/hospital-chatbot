@@ -4,7 +4,8 @@ from datetime import datetime, time, timedelta
 from chatbot import (
     run_chatbot_query,
     book_appointment,
-    df
+    df,
+    availability_on_day_for_specialty
 )
 
 # ===============================
@@ -63,10 +64,9 @@ if menu == "ℹ️ About":
     )
 
 # ===============================
-# DOCTORS TAB (STYLED + LINE BY LINE)
+# DOCTORS TAB (FULL INFO)
 # ===============================
 elif menu == "👨‍⚕️ Doctors":
-
     st.markdown(
         """
         <h2 style="
@@ -96,19 +96,15 @@ elif menu == "👨‍⚕️ Doctors":
                 <div style="font-size:20px; font-weight:800; color:#0f172a;">
                     🧑‍⚕️ {r['Doctor Name']}
                 </div>
-
                 <div style="margin-top:6px;">
                     🩺 <b>Speciality:</b> {r['Speciality']}
                 </div>
-
                 <div>
                     ⏰ <b>Consultation Time:</b> {r['Consultation Time']}
                 </div>
-
                 <div>
                     📅 <b>Available Days:</b> {r['Available days']}
                 </div>
-
                 <div>
                     📍 <b>Location:</b> {r['Location']}
                 </div>
@@ -121,7 +117,6 @@ elif menu == "👨‍⚕️ Doctors":
 # CHATBOT TAB
 # ===============================
 elif menu == "💬 Chatbot":
-
     st.subheader("💬 Ask the Hospital Assistant")
 
     if "chat_history" not in st.session_state:
@@ -131,6 +126,9 @@ elif menu == "💬 Chatbot":
 
     if st.button("Send") and user_input.strip():
         reply = run_chatbot_query(user_input)
+        # Convert multiline speciality response to line by line
+        if "\n" in reply:
+            reply = reply.replace("\n", "<br>")
         st.session_state.chat_history.append(("You", user_input))
         st.session_state.chat_history.append(("Bot", reply))
 
@@ -138,13 +136,12 @@ elif menu == "💬 Chatbot":
         if role == "You":
             st.markdown(f"🧑 **You:** {msg}")
         else:
-            st.markdown(f"🤖 **Bot:** {msg}")
+            st.markdown(f"🤖 **Bot:** {msg}", unsafe_allow_html=True)
 
 # ===============================
 # BOOK APPOINTMENT TAB
 # ===============================
 elif menu == "📅 Book Appointment":
-
     st.subheader("📅 Book an Appointment")
 
     patient_name = st.text_input("👤 Patient Name")
@@ -170,7 +167,8 @@ elif menu == "📅 Book Appointment":
         value=time(9, 0)
     )
 
-    time_str = selected_time.strftime("%I%p")
+    # Format time for booking
+    time_str = selected_time.strftime("%I:%M%p").lstrip("0")  # e.g., "9:30AM"
 
     if st.button("✅ Confirm Appointment"):
         if not patient_name.strip():
