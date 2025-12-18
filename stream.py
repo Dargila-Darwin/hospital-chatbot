@@ -98,7 +98,7 @@ general_numbers = [
 ]
 for num in general_numbers:
     st.sidebar.markdown(f"📱 {num}")
-===============================
+#===============================
 # SESSION STATE
 # ===============================
 if "messages" not in st.session_state:
@@ -211,3 +211,4 @@ if user_input:
     })
 
     st.rerun()
+
