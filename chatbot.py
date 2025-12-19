@@ -221,7 +221,13 @@ def book_appointment(doctor, patient, day, time_str):
         return f"❌ Outside consultation hours ({row['Consultation Time']})."
 
     appt_df = pd.read_csv(appointments_file)
-    appt_df.loc[len(appt_df)] = [doctor, patient, day.capitalize(), time_str.upper()]
+    appt_df.loc[len(appt_df)] =  {
+        "Doctor Name": doctor,
+        "Patient Name": patient,
+        "Day": day.capitalize(),
+        "Time": time_str.upper()
+    }
+    #[doctor, patient, day.capitalize(), time_str.upper()]
     appt_df.to_csv(appointments_file, index=False)
 
     return f"✅ Appointment confirmed with **{doctor}** on **{day.capitalize()}** at **{time_str.upper()}**."
@@ -279,6 +285,7 @@ def chatbot_response(query):
 # ===============================
 def run_chatbot_query(query):
     return chatbot_response(query)
+
 
 
 
