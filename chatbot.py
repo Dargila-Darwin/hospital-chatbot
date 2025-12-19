@@ -195,11 +195,11 @@ def is_time_within_slot(consult_time, booking_time):
 # ===============================
 # APPOINTMENT BOOKING
 # ===============================
-appointments_file = "appointments.csv"
-if not os.path.exists(appointments_file):
+#appointments_file = "appointments.csv"
+if not os.path.exists("appointments.csv"):
     pd.DataFrame(
         columns=["Doctor Name", "Patient Name", "Day", "Time"]   
-    ).to_csv(appointments_file, index=False)
+    ).to_csv("appointments.csv", index=False)
 
 def book_appointment(doctor, patient, day, time_str):
     row = df[df["Doctor Name"].str.lower() == doctor.lower()]
@@ -220,7 +220,7 @@ def book_appointment(doctor, patient, day, time_str):
     if not is_time_within_slot(row["Consultation Time"], booking_time):
         return f"❌ Outside consultation hours ({row['Consultation Time']})."
 
-    appt_df = pd.read_csv(appointments_file)
+    appt_df = pd.read_csv("appointments.csv")
     appt_df.loc[len(appt_df)] =  {
         "Doctor Name": doctor,
         "Patient Name": patient,
@@ -228,7 +228,7 @@ def book_appointment(doctor, patient, day, time_str):
         "Time": time_str.upper()
     }
     #[doctor, patient, day.capitalize(), time_str.upper()]
-    appt_df.to_csv(appointments_file, index=False)
+    appt_df.to_csv("appointments.csv", index=False)
 
     return f"✅ Appointment confirmed with **{doctor}** on **{day.capitalize()}** at **{time_str.upper()}**."
 
@@ -285,6 +285,7 @@ def chatbot_response(query):
 # ===============================
 def run_chatbot_query(query):
     return chatbot_response(query)
+
 
 
 
