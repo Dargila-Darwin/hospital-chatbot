@@ -210,7 +210,7 @@ with st.sidebar.expander("🩺 Specialities"):
     - Paediatrician  
     """)
 
-with st.sidebar.expander("📍 Location"):
+with st.sidebar.expander("🏥 Location"):
     st.markdown("""
     **PRS Hospital**  
     Killipalam,  
@@ -218,9 +218,34 @@ with st.sidebar.expander("📍 Location"):
     Kerala – 695002
     """)
 
-with st.sidebar.expander("📞 Contact"):
-    st.markdown("""
-    🚑 **Emergency & Ambulance**  
-    **+91 9497 247 365**
-    """)
+# Appointment Booking Section (clickable)
+st.sidebar.subheader("📅 Appointment Booking")
+appointment_numbers = [
+    "+91 9876543210",
+    "+91 9678547645",
+    "+91 9234765840"
+]
+for num in appointment_numbers:
+    st.sidebar.markdown(f"📞 {num}")
+    st.sidebar.markdown(f"[Call {num}](tel:{num.replace(' ', '')})")
+
+# Emergency Contact Section (non-clickable)
+st.sidebar.subheader("🚨 Emergency Numbers")
+emergency_numbers = [
+    "+91 9678768843",
+    "+91 9568746574"
+]
+for num in emergency_numbers:
+    st.sidebar.markdown(f"⚠️ **{num}**")
+
+# General Contact Numbers (non-clickable)
+st.sidebar.subheader("📞 General Contact Numbers")
+general_numbers = [
+    "+91 9448123456",
+    "+91 9448234567"
+]
+for num in general_numbers:
+    st.sidebar.markdown(f"📱 {num}")
+
+
 
