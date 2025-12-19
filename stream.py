@@ -185,3 +185,42 @@ elif menu == "📅 Book Appointment":
                 st.success(result)
             else:
                 st.error(result)
+
+
+with st.sidebar.expander("🩺 Specialities"):
+    st.markdown("""
+    - Cardiologist  
+    - ENT  
+    - Gastroenterologist  
+    - Gynecologist  
+    - Nephrologist  
+    - Neurologist  
+    - Urologist  
+    - Pulmonologist  
+    - Dermatologist  
+    - Ophthalmologist  
+    - Orthopaedician  
+    - Oncologist  
+    - Pathologist  
+    - Radiologist  
+    - Psychiatrist  
+    - Psychologist  
+    - Endocrinologist  
+    - General Surgeon  
+    - Paediatrician  
+    """)
+
+with st.sidebar.expander("📍 Location"):
+    st.markdown("""
+    **PRS Hospital**  
+    Killipalam,  
+    Thiruvananthapuram,  
+    Kerala – 695002
+    """)
+
+with st.sidebar.expander("📞 Contact"):
+    st.markdown("""
+    🚑 **Emergency & Ambulance**  
+    **+91 9497 247 365**
+    """)
+
