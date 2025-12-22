@@ -188,20 +188,13 @@ def is_time_within_slot(consult_time, booking_time):
         return False
 
     return start <= booking_time <= end
+
 def is_past_time(day, booking_time):
     today = datetime.now()
-    booking_day = day.lower()
-
-    # If booking is not today → OK
-    if booking_day != today.strftime("%A").lower():
+    if day.lower() != today.strftime("%A").lower():
         return False
-
-    # If today → compare time
     return booking_time <= today.time()
 
-    # ❌ BLOCK past time for today
-    if is_past_time(day, booking_time):
-        return "❌ You cannot book an appointment for a past time today."
 
 
 
@@ -288,6 +281,17 @@ def chatbot_response(query):
         today = datetime.now().strftime("%A").lower()
         return availability_on_day_for_specialty(specialty, today)
 
+       
+    if intent == "book_appointment" and doctor and day:
+        time_match = re.search(r"\b(\d{1,2}(:\d{2})?\s*(am|pm))\b", query, re.I)
+        if not time_match:
+            return "❌ Please specify a time (example: 10AM or 4:30PM)"
+
+        time_str = time_match.group(1)
+        patient = "Guest"  # you can improve later
+
+        return book_appointment(doctor, patient, day, time_str)
+
     return (
         "🤖 I can help with:\n"
         "• Doctor availability (today / tomorrow / specific day)\n"
@@ -301,6 +305,7 @@ def chatbot_response(query):
 # ===============================
 def run_chatbot_query(query):
     return chatbot_response(query)
+
 
 
 
