@@ -188,7 +188,20 @@ def is_time_within_slot(consult_time, booking_time):
         return False
 
     return start <= booking_time <= end
+def is_past_time(day, booking_time):
+    today = datetime.now()
+    booking_day = day.lower()
 
+    # If booking is not today → OK
+    if booking_day != today.strftime("%A").lower():
+        return False
+
+    # If today → compare time
+    return booking_time <= today.time()
+
+    # ❌ BLOCK past time for today
+    if is_past_time(day, booking_time):
+        return "❌ You cannot book an appointment for a past time today."
 
 
 
@@ -212,10 +225,13 @@ def book_appointment(doctor, patient, day, time_str):
     if not is_available_on(day, row["Available days"]):
         return f"❌ {doctor} is not available on {day.capitalize()}."
 
-    try:
-        booking_time = parse_time(time_str)
-    except:
+    booking_time = parse_time(time_str)
+    if booking_time is None:
         return "❌ Invalid time format (use 10AM, 3PM)."
+
+    # 🔴 NEW CHECK (CRITICAL)
+    if is_past_time(day, booking_time):
+        return "❌ You cannot book an appointment for a past time today."
 
     if not is_time_within_slot(row["Consultation Time"], booking_time):
         return f"❌ Outside consultation hours ({row['Consultation Time']})."
@@ -285,6 +301,7 @@ def chatbot_response(query):
 # ===============================
 def run_chatbot_query(query):
     return chatbot_response(query)
+
 
 
 
