@@ -1,4 +1,7 @@
 import streamlit as st
+import psycopg2
+
+
 from datetime import datetime, time, timedelta
 
 import os
@@ -280,6 +283,7 @@ general_numbers = [
 ]
 for num in general_numbers:
     st.sidebar.markdown(f"📱 {num}")
+
 
 
 
