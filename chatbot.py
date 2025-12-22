@@ -11,8 +11,45 @@ import joblib
 from datetime import datetime, timedelta
 from transformers import BertTokenizer, BertForSequenceClassification
 import gdown
+import psycopg2         # ← Add here
+import streamlit as st 
 
 # ===============================
+def get_db_connection():
+    return psycopg2.connect(
+        host=st.secrets["DB_HOST"],
+        database=st.secrets["DB_NAME"],
+        user=st.secrets["DB_USER"],
+        password=st.secrets["DB_PASSWORD"],
+        port=st.secrets["DB_PORT"],
+        sslmode="require"
+    )
+
+# ===============================
+# INITIALIZE DATABASE (TABLE CREATION)
+# ===============================
+def init_db():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS appointments (
+            id SERIAL PRIMARY KEY,
+            doctor_name TEXT,
+            patient_name TEXT,
+            day TEXT,
+            time TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    cur.close()
+    conn.close()
+
+# Call once at startup
+init_db()
+
+
+#--------------------------------
 # MODEL DOWNLOAD
 # ===============================
 model_path = "./bert_doctor_classification"
@@ -200,10 +237,10 @@ def is_past_time(day, booking_time):
 # APPOINTMENT BOOKING
 # ===============================
 #appointments_file = "appointments.csv"
-if not os.path.exists("appointments.csv"):
-    pd.DataFrame(
-        columns=["Doctor Name", "Patient Name", "Day", "Time"]   
-    ).to_csv("appointments.csv", index=False)
+#if not os.path.exists("appointments.csv"):
+   # pd.DataFrame(
+        #columns=["Doctor Name", "Patient Name", "Day", "Time"]   
+    #).to_csv("appointments.csv", index=False)
 
 def book_appointment(doctor, patient, day, time_str):
     row = df[df["Doctor Name"].str.lower() == doctor.lower()]
@@ -227,15 +264,24 @@ def book_appointment(doctor, patient, day, time_str):
     if not is_time_within_slot(row["Consultation Time"], booking_time):
         return f"❌ Outside consultation hours ({row['Consultation Time']})."
 
-    appt_df = pd.read_csv("appointments.csv")
-    appt_df.loc[len(appt_df)] =  {
-        "Doctor Name": doctor,
-        "Patient Name": patient,
-        "Day": day.capitalize(),
-        "Time": time_str.upper()
-    }
-    #[doctor, patient, day.capitalize(), time_str.upper()]
-    appt_df.to_csv("appointments.csv", index=False)
+    # Connect to PostgreSQL
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        INSERT INTO appointments (doctor_name, patient_name, day, time)
+        VALUES (%s, %s, %s, %s)
+    """, (
+        doctor,
+        patient,
+        day.capitalize(),
+        time_str.upper()
+))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
 
     return f"✅ Appointment confirmed with **{doctor}** on **{day.capitalize()}** at **{time_str.upper()}**."
 
@@ -303,6 +349,7 @@ def chatbot_response(query):
 # ===============================
 def run_chatbot_query(query):
     return chatbot_response(query)
+
 
 
 
