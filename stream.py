@@ -85,7 +85,7 @@ def set_background(image_path):
 # CALL THE FUNCTION
 # ===============================
 # Replace with your folder/filename if different
-set_background("assets/hospital_bg.png")
+set_background("assets/hos-image.jpg")
 
 
 # FIXED HEADER
@@ -327,6 +327,7 @@ general_numbers = [
 ]
 for num in general_numbers:
     st.sidebar.markdown(f"📱 {num}")
+
 
 
 
