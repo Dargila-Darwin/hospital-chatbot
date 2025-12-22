@@ -1,7 +1,6 @@
 import streamlit as st
 from datetime import datetime, time, timedelta
 
-import base64
 import os
 
 from chatbot import (
@@ -30,62 +29,7 @@ st.set_page_config(
 # ===============================
 # BACKGROUND IMAGE FUNCTION
 # ===============================
-def set_background(image_path):
-    """
-    Sets a background image in Streamlit.
-    Accepts either a file in the same folder or a subfolder.
-    """
-    if not os.path.exists(image_path):
-        st.warning(f"Background image not found: {image_path}")
-        return
 
-    with open(image_path, "rb") as img_file:
-        encoded = base64.b64encode(img_file.read()).decode()
-
-    st.markdown(
-        f"""
-        <style>
-        .stApp {{
-            background-image: url("data:image/png;base64,{encoded}");
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            background-attachment: fixed;
-        }}
-
-        /* Optional light overlay to increase brightness */
-        .stApp::before {{
-            content: "";
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(255, 255, 255, 0.45);
-            z-index: -1;
-        }}
-
-        /* Main content container */
-        .block-container {{
-            background-color: rgba(255,255,255,0.95);
-            padding: 2rem;
-            border-radius: 16px;
-        }}
-
-        /* Sidebar */
-        section[data-testid="stSidebar"] {{
-            background-color: rgba(255,255,255,0.97);
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-
-# ===============================
-# CALL THE FUNCTION
-# ===============================
-# Replace with your folder/filename if different
-set_background("assets/hos-image.jpg")
 
 
 # FIXED HEADER
@@ -336,6 +280,7 @@ general_numbers = [
 ]
 for num in general_numbers:
     st.sidebar.markdown(f"📱 {num}")
+
 
 
 
