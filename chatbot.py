@@ -178,16 +178,14 @@ def is_time_within_slot(consult_time, booking_time):
     if "-" not in consult_time:
         return False  # invalid format
 
-    parts = consult_time.split("-")
-    if len(parts) != 2:
-        return False
+    start_str, end_str = consult_time.split("-")
+    start = parse_time(start_str.strip())
+    end = parse_time(end_str.strip())
 
-    start = parse_time(parts[0].strip())
-    end = parse_time(parts[1].strip())
     if start is None or end is None:
         return False
 
-    return start <= booking_time <= end
+    return start <= booking_time < end
 
 def is_past_time(day, booking_time):
     today = datetime.now()
@@ -305,6 +303,7 @@ def chatbot_response(query):
 # ===============================
 def run_chatbot_query(query):
     return chatbot_response(query)
+
 
 
 
