@@ -231,11 +231,20 @@ elif menu == "📅 Book Appointment":
 
     day = date.strftime("%A").lower()
 
-    # Time picker
+    
+
+    START_TIME = time(9, 0)
+    END_TIME = time(18, 0)
+
     selected_time = st.time_input(
         "⏰ Select Time",
-        value=time(9, 0)
-    )
+        value=START_TIME
+)
+
+    if not (START_TIME <= selected_time <= END_TIME):
+        st.error("❌ Appointment time must be between 9:00 AM and 6:00 PM")
+        st.stop()
+
 
     # Format time for booking
     time_str = selected_time.strftime("%I:%M%p").lstrip("0")  # e.g., "9:30AM"
@@ -327,6 +336,7 @@ general_numbers = [
 ]
 for num in general_numbers:
     st.sidebar.markdown(f"📱 {num}")
+
 
 
 
