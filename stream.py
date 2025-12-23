@@ -11,10 +11,19 @@ import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 APPOINTMENTS_FILE = os.path.join(BASE_DIR, "appointments.csv")
 
+# Fix old CSV if it has 'Day' column
+if os.path.exists(APPOINTMENTS_FILE):
+    df_existing = pd.read_csv(APPOINTMENTS_FILE)
+    if "Day" in df_existing.columns:
+        df_existing.rename(columns={"Day": "Date"}, inplace=True)
+        df_existing.to_csv(APPOINTMENTS_FILE, index=False)
+
+# Create new CSV if it doesn't exist
 if not os.path.exists(APPOINTMENTS_FILE):
     pd.DataFrame(
         columns=["Doctor Name", "Patient Name", "Date", "Time"]
     ).to_csv(APPOINTMENTS_FILE, index=False)
+
 
 
 
@@ -235,10 +244,22 @@ elif menu == "📅 Book Appointment":
 
    
 
+# ===============================
+# SIDEBAR
+# ===============================
 
 
+# Hospital Info
+with st.sidebar.expander("🏥 Hospital Info", expanded=True):
+    st.markdown("""
+    **PRS Hospital**  
+    Killipalam,  
+    Thiruvananthapuram,  
+    Kerala – 695002
+    """)
 
-with st.sidebar.expander("🩺 Specialities"):
+# Specialities
+with st.sidebar.expander("🩺 Specialities", expanded=False):
     st.markdown("""
     - Cardiologist  
     - ENT  
@@ -261,50 +282,38 @@ with st.sidebar.expander("🩺 Specialities"):
     - Paediatrician  
     """)
 
-with st.sidebar.expander("🏥 Location"):
-    st.markdown("""
-    **PRS Hospital**  
-    Killipalam,  
-    Thiruvananthapuram,  
-    Kerala – 695002
-    """)
+# Appointment Booking Contacts
+with st.sidebar.expander("📅 Book Appointment Contacts", expanded=True):
+    appointment_numbers = [
+        "+91 9876543210",
+        "+91 9678547645",
+        "+91 9234765840"
+    ]
+    for num in appointment_numbers:
+        st.markdown(f"📞 {num}")
+        st.markdown(f"[Call {num}](tel:{num.replace(' ', '')})")
 
+# Emergency Numbers
+with st.sidebar.expander("🚨 Emergency Numbers", expanded=False):
+    emergency_numbers = [
+        "+91 9678768843",
+        "+91 9568746574"
+    ]
+    for num in emergency_numbers:
+        st.markdown(f"⚠️ **{num}**")
 
+# General Contact Numbers
+with st.sidebar.expander("📞 General Contact Numbers", expanded=False):
+    general_numbers = [
+        "+91 9448123456",
+        "+91 9448234567"
+    ]
+    for num in general_numbers:
+        st.markdown(f"📱 {num}")
 
-
-
-
-# Appointment Booking Section (clickable)
-st.sidebar.subheader("📅 Appointment Booking")
-appointment_numbers = [
-    "+91 9876543210",
-    "+91 9678547645",
-    "+91 9234765840"
-]
-for num in appointment_numbers:
-    st.sidebar.markdown(f"📞 {num}")
-    st.sidebar.markdown(f"[Call {num}](tel:{num.replace(' ', '')})")
-
-# Emergency Contact Section (non-clickable)
-st.sidebar.subheader("🚨 Emergency Numbers")
-emergency_numbers = [
-    "+91 9678768843",
-    "+91 9568746574"
-]
-for num in emergency_numbers:
-    st.sidebar.markdown(f"⚠️ **{num}**")
-
-# General Contact Numbers (non-clickable)
-st.sidebar.subheader("📞 General Contact Numbers")
-general_numbers = [
-    "+91 9448123456",
-    "+91 9448234567"
-]
-for num in general_numbers:
-    st.sidebar.markdown(f"📱 {num}")
-
-st.subheader("📋 Saved Appointments")
-st.dataframe(pd.read_csv(APPOINTMENTS_FILE))
+# Saved Appointments
+with st.sidebar.expander("📋 Saved Appointments", expanded=True):
+    st.dataframe(pd.read_csv(APPOINTMENTS_FILE))
 
 
 
