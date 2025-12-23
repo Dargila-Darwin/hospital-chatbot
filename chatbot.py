@@ -13,6 +13,11 @@ from transformers import BertTokenizer, BertForSequenceClassification
 import gdown
 
 # ===============================
+
+# 🔴 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+APPOINTMENTS_FILE = os.path.join(BASE_DIR, "appointments.csv")
+
 # MODEL DOWNLOAD
 # ===============================
 model_path = "./bert_doctor_classification"
@@ -200,10 +205,11 @@ def is_past_time(day, booking_time):
 # APPOINTMENT BOOKING
 # ===============================
 #appointments_file = "appointments.csv"
-if not os.path.exists("appointments.csv"):
+if not os.path.exists(APPOINTMENTS_FILE):
     pd.DataFrame(
-        columns=["Doctor Name", "Patient Name", "Day", "Time"]   
-    ).to_csv("appointments.csv", index=False)
+        columns=["Doctor Name", "Patient Name", "Day", "Time"]
+    ).to_csv(APPOINTMENTS_FILE, index=False)
+
 
 def book_appointment(doctor, patient, day, time_str):
     row = df[df["Doctor Name"].str.lower() == doctor.lower()]
@@ -227,14 +233,17 @@ def book_appointment(doctor, patient, day, time_str):
     if not is_time_within_slot(row["Consultation Time"], booking_time):
         return f"❌ Outside consultation hours ({row['Consultation Time']})."
 
-    appt_df = pd.read_csv("appointments.csv")
+    appt_df = pd.read_csv(APPOINTMENTS_FILE)
+
     appt_df.loc[len(appt_df)] =  {
     "Doctor Name": doctor,
     "Patient Name": patient,
     "Day": day.capitalize(),
     "Time": time_str.upper()
 }
-    appt_df.to_csv("appointments.csv", index=False)
+    appt_df.to_csv(APPOINTMENTS_FILE, index=False)
+    print("Appointments CSV saved at:", APPOINTMENTS_FILE)
+
 
 
 
@@ -304,3 +313,4 @@ def chatbot_response(query):
 # ===============================
 def run_chatbot_query(query):
     return chatbot_response(query)
+
