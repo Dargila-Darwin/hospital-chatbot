@@ -2,6 +2,11 @@ import streamlit as st
 
 import pandas as pd
 
+from datetime import datetime, time, timedelta
+
+import os
+
+
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 APPOINTMENTS_FILE = os.path.join(BASE_DIR, "appointments.csv")
@@ -13,9 +18,7 @@ if not os.path.exists(APPOINTMENTS_FILE):
 
 
 
-from datetime import datetime, time, timedelta
 
-import os
 
 
 
@@ -27,13 +30,6 @@ from chatbot import (
 )
 
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-APPOINTMENTS_FILE = os.path.join(BASE_DIR, "appointments.csv")
-
-if not os.path.exists(APPOINTMENTS_FILE):
-    pd.DataFrame(
-        columns=["Doctor Name", "Patient Name", "Date", "Time"]
-    ).to_csv(APPOINTMENTS_FILE, index=False)
 
 
 # ===============================
@@ -189,17 +185,13 @@ elif menu == "📅 Book Appointment":
         sorted(df["Doctor Name"].unique())
     )
 
-    # Date picker (no past dates)
     today = datetime.now().date()
     date = st.date_input(
         "📆 Select Date",
         min_value=today,
         max_value=today + timedelta(days=7)
     )
-
     day = date.strftime("%A").lower()
-
-    
 
     START_TIME = time(9, 0)
     END_TIME = time(18, 0)
@@ -207,40 +199,41 @@ elif menu == "📅 Book Appointment":
     selected_time = st.time_input(
         "⏰ Select Time",
         value=START_TIME
-)
+    )
 
     if not (START_TIME <= selected_time <= END_TIME):
         st.error("❌ Appointment time must be between 9:00 AM and 6:00 PM")
         st.stop()
 
-
-    # Format time for booking
     time_str = selected_time.strftime("%I:%M%p").lstrip("0")  # e.g., "9:30AM"
 
+    # ✅ Confirm Appointment button (only once!)
     if st.button("✅ Confirm Appointment"):
         if not patient_name.strip():
             st.error("❌ Please enter patient name")
+            st.stop()
 
-        else:
-            # 🔒 REAL-TIME CHECK FOR TODAY
-            now = datetime.now()
+        now = datetime.now()
+        if date == now.date() and selected_time <= now.time():
+            st.error("❌ Cannot book past time for today")
+            st.stop()
 
-            if date == now.date():
-                if selected_time <= now.time():
-                    st.error("❌ Cannot book past time for today")
-                    st.stop()
+        appt_df = pd.read_csv(APPOINTMENTS_FILE)
 
-            result = book_appointment(
-                doctor=doctor,
-                patient=patient_name,
-                day=day,
-                time_str=time_str
-            )
+        appt_df.loc[len(appt_df)] = {
+            "Doctor Name": doctor,
+            "Patient Name": patient_name,
+            "Date": date.isoformat(),
+            "Time": time_str
+        }
 
-            if result.startswith("✅"):
-                st.success(result)
-            else:
-                st.error(result)
+        appt_df.to_csv(APPOINTMENTS_FILE, index=False)
+
+        st.success(
+            f"✅ Appointment confirmed with {doctor} on {date.strftime('%d %B')} at {time_str}"
+        )
+
+   
 
 
 
@@ -277,28 +270,8 @@ with st.sidebar.expander("🏥 Location"):
     """)
 
 
-st.subheader("📌 Book an Appointment")
 
-doctor = st.text_input("Doctor Name")
-patient = st.text_input("Patient Name")
-date = st.date_input("Appointment Date")
-time = st.time_input("Appointment Time")
 
-if st.button("Book Appointment"):
-    if doctor and patient:
-        df = pd.read_csv(APPOINTMENTS_FILE)
-
-        df.loc[len(df)] = {
-            "Doctor Name": doctor,
-            "Patient Name": patient,
-            "Date": date.isoformat(),
-            "Time": time.strftime("%I:%M %p")
-        }
-
-        df.to_csv(APPOINTMENTS_FILE, index=False)
-        st.success("✅ Appointment saved successfully!")
-    else:
-        st.error("❌ Please fill all fields")
 
 
 # Appointment Booking Section (clickable)
@@ -332,6 +305,7 @@ for num in general_numbers:
 
 st.subheader("📋 Saved Appointments")
 st.dataframe(pd.read_csv(APPOINTMENTS_FILE))
+
 
 
 
