@@ -1,10 +1,23 @@
 import streamlit as st
 
+import pandas as pd
+
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+APPOINTMENTS_FILE = os.path.join(BASE_DIR, "appointments.csv")
+
+if not os.path.exists(APPOINTMENTS_FILE):
+    pd.DataFrame(
+        columns=["Doctor Name", "Patient Name", "Date", "Time"]
+    ).to_csv(APPOINTMENTS_FILE, index=False)
+
 
 
 from datetime import datetime, time, timedelta
 
 import os
+
+
 
 from chatbot import (
     run_chatbot_query,
@@ -13,6 +26,14 @@ from chatbot import (
     availability_on_day_for_specialty
 )
 
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+APPOINTMENTS_FILE = os.path.join(BASE_DIR, "appointments.csv")
+
+if not os.path.exists(APPOINTMENTS_FILE):
+    pd.DataFrame(
+        columns=["Doctor Name", "Patient Name", "Date", "Time"]
+    ).to_csv(APPOINTMENTS_FILE, index=False)
 
 
 # ===============================
@@ -255,6 +276,31 @@ with st.sidebar.expander("🏥 Location"):
     Kerala – 695002
     """)
 
+
+st.subheader("📌 Book an Appointment")
+
+doctor = st.text_input("Doctor Name")
+patient = st.text_input("Patient Name")
+date = st.date_input("Appointment Date")
+time = st.time_input("Appointment Time")
+
+if st.button("Book Appointment"):
+    if doctor and patient:
+        df = pd.read_csv(APPOINTMENTS_FILE)
+
+        df.loc[len(df)] = {
+            "Doctor Name": doctor,
+            "Patient Name": patient,
+            "Date": date.isoformat(),
+            "Time": time.strftime("%I:%M %p")
+        }
+
+        df.to_csv(APPOINTMENTS_FILE, index=False)
+        st.success("✅ Appointment saved successfully!")
+    else:
+        st.error("❌ Please fill all fields")
+
+
 # Appointment Booking Section (clickable)
 st.sidebar.subheader("📅 Appointment Booking")
 appointment_numbers = [
@@ -283,6 +329,11 @@ general_numbers = [
 ]
 for num in general_numbers:
     st.sidebar.markdown(f"📱 {num}")
+
+st.subheader("📋 Saved Appointments")
+st.dataframe(pd.read_csv(APPOINTMENTS_FILE))
+
+
 
 
 
