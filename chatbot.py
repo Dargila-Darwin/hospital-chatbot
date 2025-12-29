@@ -1,6 +1,5 @@
 # ===============================
-# PRS HOSPITAL CHATBOT (FINAL – CORRECT)
-# BERT LOGIC UNTOUCHED ✅
+
 # ===============================
 
 import re
@@ -44,7 +43,7 @@ for col in [
     df[col] = df[col].apply(norm)
 
 # ===============================
-# LOAD BERT (UNCHANGED)
+# LOAD BERT 
 # ===============================
 tokenizer = BertTokenizer.from_pretrained(model_path)
 model = BertForSequenceClassification.from_pretrained(model_path)
@@ -135,7 +134,7 @@ def map_field(text):
     return None
 
 # ===============================
-# AVAILABILITY LOGIC (CORRECT)
+# AVAILABILITY 
 # ===============================
 def is_available_on(day, available_text):
     if not day:
@@ -164,12 +163,6 @@ def parse_time(t):
             continue
     return None
 
-
-#def is_time_within_slot(consult_time, booking_time):
- #   consult_time = consult_time.replace("–", "-")
-  #  start, end = consult_time.split("-")
-   # return parse_time(start) <= booking_time <= parse_time(end)
-##############################################################
 def is_time_within_slot(consult_time, booking_time):
     """
     Checks if the booking_time falls within the consult_time slot.
@@ -313,4 +306,5 @@ def chatbot_response(query):
 # ===============================
 def run_chatbot_query(query):
     return chatbot_response(query)
+
 
