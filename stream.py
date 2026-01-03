@@ -34,10 +34,7 @@ if not os.path.exists(APPOINTMENTS_FILE):
 # ===============================
 # IMPORT CHATBOT & DOCTORS DF
 # ===============================
-from chatbot import (
-    run_chatbot_query,
-    df
-)
+from chatbot import run_chatbot_query, df
 
 # Clean doctor dataframe
 df["Doctor Name"] = df["Doctor Name"].str.strip()
@@ -49,7 +46,6 @@ df["Available days"] = df["Available days"].str.strip()
 # ===============================
 ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "admin123"
-
 if "is_admin" not in st.session_state:
     st.session_state.is_admin = False
 
@@ -99,10 +95,7 @@ menu = st.sidebar.radio(
 # SIDEBAR INFO
 # ===============================
 with st.sidebar.expander("🏥 Hospital Info", expanded=True):
-    st.markdown("""
-    **PRS Hospital**  
-    Thiruvananthapuram, Kerala
-    """)
+    st.markdown("**PRS Hospital**  \nThiruvananthapuram, Kerala")
 
 with st.sidebar.expander("📞 Emergency", expanded=False):
     st.markdown("🚨 +91 9678768843")
@@ -213,9 +206,79 @@ elif menu == "📅 Book Appointment":
     patient_name = st.text_input("👤 Patient Name")
     phone = st.text_input("📞 Phone Number")
 
-    doctor = st.selectbox(
-    "👨‍⚕️ Select Doctor",
-    sorted(df["Doctor Name"].unique())
-)
+    # Filter doctors by speciality
+    if selected_spec != "All":
+        doctor_list = df[df["Speciality"].str.strip().str.lower() == selected_spec.lower()]["Doctor Name"].unique()
+    else:
+        doctor_list = df["Doctor Name"].unique()
 
+    doctor = st.selectbox("👨‍⚕️ Select Doctor", sorted(doctor_list))
 
+    # Calendar for date selection
+    today = datetime.now().date()
+    date = st.date_input(
+        "📆 Select Date",
+        min_value=today,
+        max_value=today + timedelta(days=7)
+    )
+
+    # Time picker
+    START_TIME = time(9, 0)
+    END_TIME = time(18, 0)
+    selected_time = st.time_input("⏰ Select Time", value=START_TIME)
+
+    if not (START_TIME <= selected_time <= END_TIME):
+        st.error("❌ Appointment time must be between 9 AM and 6 PM")
+        st.stop()
+
+    time_str = selected_time.strftime("%I:%M%p").lstrip("0")
+
+    # Confirm appointment
+    if st.button("✅ Confirm Appointment"):
+        if not patient_name.strip():
+            st.error("❌ Please enter patient name")
+            st.stop()
+        if not phone.isdigit() or len(phone) != 10:
+            st.error("❌ Enter a valid 10-digit phone number")
+            st.stop()
+
+        # Check doctor availability
+        doc_row = df[df["Doctor Name"] == doctor].iloc[0]
+        available_days = [d.strip().lower() for d in doc_row["Available days"].split(",")]
+        day_name = date.strftime("%A").lower()
+        if day_name not in available_days:
+            st.error(f"❌ {doctor} is not available on {date.strftime('%A')}")
+            st.stop()
+
+        # Load appointments
+        appt_df = pd.read_csv(APPOINTMENTS_FILE)
+
+        # Max 20 appointments per doctor per day
+        count = appt_df[(appt_df["Doctor Name"] == doctor) & (appt_df["Date"] == date.isoformat())].shape[0]
+        if count >= 20:
+            st.error("❌ Slots full for this doctor on selected day")
+            st.stop()
+
+        # Save appointment
+        appt_df.loc[len(appt_df)] = {
+            "Doctor Name": doctor,
+            "Patient Name": patient_name,
+            "Phone": phone,
+            "Date": date.isoformat(),
+            "Time": time_str,
+            "Reminder Sent": False
+        }
+        appt_df.to_csv(APPOINTMENTS_FILE, index=False)
+
+        # Mock SMS confirmation
+        send_mock_sms(phone, f"PRS Hospital: Appointment confirmed with {doctor} on {date.strftime('%d %b')} at {time_str}.")
+        st.success(f"✅ Appointment confirmed with {doctor} on {date.strftime('%d %B')} at {time_str}")
+        st.info("📩 Confirmation SMS sent (simulated)")
+
+# ===============================
+# ADMIN VIEW
+# ===============================
+if st.session_state.is_admin:
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("## 📋 Saved Appointments (Admin)")
+    st.sidebar.dataframe(pd.read_csv(APPOINTMENTS_FILE))
