@@ -214,4 +214,8 @@ elif menu == "📅 Book Appointment":
     phone = st.text_input("📞 Phone Number")
 
     doctor = st.selectbox(
-        "👨‍⚕️
+    "👨‍⚕️ Select Doctor",
+    sorted(df["Doctor Name"].unique())
+)
+
+
