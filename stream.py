@@ -205,7 +205,16 @@ elif menu == "📅 Book Appointment":
             e = next(d for d in days if d.startswith(e[:3]))
             ok = days.index(s) <= days.index(day_name) <= days.index(e)
         else:
-            ok = day_name in [next(d for d in days if d.startswith(x[:3])) for x in raw.split(",")]
+            allowed_days = []
+
+            for x in raw.split(","):
+                x = x.strip().lower()
+                for d in days:
+                    if d.startswith(x[:3]):
+                        allowed_days.append(d)
+
+ok = day_name in allowed_days
+
 
         if not ok:
             st.error(f"❌ {doctor} not available on {selected_date.strftime('%A')}")
@@ -238,3 +247,4 @@ if st.session_state.is_admin:
     st.sidebar.markdown("---")
     st.sidebar.markdown("## 📋 Saved Appointments")
     st.sidebar.dataframe(pd.read_csv(APPOINTMENTS_FILE))
+
