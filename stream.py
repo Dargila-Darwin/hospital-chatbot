@@ -190,29 +190,29 @@ elif menu == "📅 Book Appointment":
 
     available_doctors = []
     for _, r in df.iterrows():
-    raw = r["Available days"].lower().strip()
+        raw = r["Available days"].lower().strip()
 
     # universal keywords
-    if any(k in raw for k in ["all", "everyday", "daily"]):
-        available_doctors.append(r["Doctor Name"])
-        continue
-
-    # handle ranges like monday-friday
-    if "-" in raw or "to" in raw:
-        if day_name[:3] in raw:
+        if any(k in raw for k in ["all", "everyday", "daily"]):
             available_doctors.append(r["Doctor Name"])
-        continue
-
-    # normal comma-separated days
-    allowed_days = []
-    for x in raw.split(","):
-        x = x.strip()
-        for d in days_list:
-            if d.startswith(x[:3]):
-                allowed_days.append(d)
-
-    if day_name in allowed_days:
-        available_doctors.append(r["Doctor Name"])
+            continue
+    
+        # handle ranges like monday-friday
+        if "-" in raw or "to" in raw:
+            if day_name[:3] in raw:
+                available_doctors.append(r["Doctor Name"])
+            continue
+    
+        # normal comma-separated days
+        allowed_days = []
+        for x in raw.split(","):
+            x = x.strip()
+            for d in days_list:
+                if d.startswith(x[:3]):
+                    allowed_days.append(d)
+    
+        if day_name in allowed_days:
+            available_doctors.append(r["Doctor Name"])
 
 
     if not available_doctors:
@@ -272,4 +272,5 @@ if st.session_state.is_admin:
     st.sidebar.markdown("---")
     st.sidebar.subheader("📋 Saved Appointments")
     st.sidebar.dataframe(pd.read_csv(APPOINTMENTS_FILE))
+
 
