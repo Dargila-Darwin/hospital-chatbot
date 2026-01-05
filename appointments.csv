@@ -1,6 +1,7 @@
-Doctor Name,Patient Name,Phone,Date,Time,Reminder
+Doctor Name,Patient Name,Phone,Date,Time,Reminder sent
 ,,,,,
 ,,,,,
 Dr. Krishna Kumar K,aaa,1234567896,Tuesday,,
 Dr. Krishna Kumar K,aaa,1234567867,Tuesday,,
 Dr. Prakash N Nair,ddd,987654321,Tuesday,,
+
