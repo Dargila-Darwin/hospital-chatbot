@@ -223,9 +223,92 @@ elif menu == "📅 Book Appointment":
             st.info("📩 Confirmation SMS sent (simulated)")
 
 # ===============================
+
+
+# Hospital Info
+with st.sidebar.expander("🏥 Hospital Info", expanded=True):
+    st.markdown("""
+    **PRS Hospital**  
+    Killipalam,  
+    Thiruvananthapuram,  
+    Kerala – 695002
+    """)
+
+# Specialities
+with st.sidebar.expander("🩺 Specialities", expanded=False):
+    st.markdown("""
+    - Cardiologist  
+    - ENT  
+    - Gastroenterologist  
+    - Gynecologist  
+    - Nephrologist  
+    - Neurologist  
+    - Urologist  
+    - Pulmonologist  
+    - Dermatologist  
+    - Ophthalmologist  
+    - Orthopaedician  
+    - Oncologist  
+    - Pathologist  
+    - Radiologist  
+    - Psychiatrist  
+    - Psychologist  
+    - Endocrinologist  
+    - General Surgeon  
+    - Paediatrician  
+    """)
+
+# Appointment Booking Contacts
+with st.sidebar.expander("📅 Book Appointment Contacts", expanded=True):
+    appointment_numbers = [
+        "+91 9876543210",
+        "+91 9678547645",
+        "+91 9234765840"
+    ]
+    for num in appointment_numbers:
+        st.markdown(f"📞 {num}")
+        st.markdown(f"[Call {num}](tel:{num.replace(' ', '')})")
+
+# Emergency Numbers
+with st.sidebar.expander("🚨 Emergency Numbers", expanded=False):
+    emergency_numbers = [
+        "+91 9678768843",
+        "+91 9568746574"
+    ]
+    for num in emergency_numbers:
+        st.markdown(f"⚠️ **{num}**")
+
+# General Contact Numbers
+with st.sidebar.expander("📞 General Contact Numbers", expanded=False):
+    general_numbers = [
+        "+91 9448123456",
+        "+91 9448234567"
+    ]
+    for num in general_numbers:
+        st.markdown(f"📱 {num}")
 # ADMIN VIEW
 # ===============================
-if st.session_state.is_admin:
+# ---------- ADMIN (SIDEBAR) ----------
+st.sidebar.markdown("---")
+st.sidebar.subheader("🔐 Admin Login")
+
+if not st.session_state.is_admin:
+    username = st.sidebar.text_input("Username")
+    password = st.sidebar.text_input("Password", type="password")
+    if st.sidebar.button("Login"):
+        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+            st.session_state.is_admin = True
+            st.sidebar.success("Admin logged in")
+        else:
+            st.sidebar.error("Invalid credentials")
+else:
+    st.sidebar.success("Admin logged in")
+    if st.sidebar.button("Logout"):
+        st.session_state.is_admin = False
+
+    # Admin view
     st.sidebar.markdown("---")
     st.sidebar.subheader("📋 Saved Appointments")
     st.sidebar.dataframe(pd.read_csv(APPOINTMENTS_FILE))
+
+
