@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime, time, timedelta
+from datetime import datetime, timedelta
 import os
 
 # ===============================
@@ -114,11 +114,7 @@ with st.sidebar.expander("🩺 Specialities", expanded=False):
     """)
 
 with st.sidebar.expander("📅 Book Appointment Contacts", expanded=True):
-    appointment_numbers = [
-        "+91 9876543210",
-        "+91 9678547645",
-        "+91 9234765840"
-    ]
+    appointment_numbers = ["+91 9876543210", "+91 9678547645", "+91 9234765840"]
     for num in appointment_numbers:
         st.markdown(f"📞 {num}")
         st.markdown(f"[Call {num}](tel:{num.replace(' ', '')})")
@@ -174,17 +170,16 @@ elif menu == "💬 Chatbot":
 # ===============================
 elif menu == "📅 Book Appointment":
     st.subheader("📅 Book an Appointment")
-
-    # Patient Details inside booking page
-    patient_name = st.text_input("Patient Name")
-    phone = st.text_input("Phone Number")
-
     today = datetime.now().date()
     selected_date = st.date_input("📆 Select Date", min_value=today, max_value=today + timedelta(days=7))
     selected_time = st.time_input("⏰ Select Time", time(9, 0))
 
-    # Default doctor (first in df)
-    selected_doctor_name = df.iloc[0]["Doctor Name"]
+    # Doctor selection inside booking page
+    selected_doctor_name = st.selectbox("👨‍⚕️ Select Doctor", df["Doctor Name"].tolist())
+
+    # Patient details inside booking
+    patient_name = st.text_input("👤 Patient Name")
+    phone = st.text_input("📞 Phone Number")
 
     if st.button("✅ Confirm Appointment"):
         if not patient_name.strip():
@@ -193,7 +188,7 @@ elif menu == "📅 Book Appointment":
         if not phone.isdigit() or len(phone) != 10:
             st.error("❌ Enter a valid 10-digit phone number")
             st.stop()
-
+        
         # Check doctor availability
         doc_row = df[df["Doctor Name"] == selected_doctor_name].iloc[0]
         raw_days = doc_row["Available days"].lower()
@@ -218,7 +213,8 @@ elif menu == "📅 Book Appointment":
             st.stop()
 
         # Load appointments CSV
-        appt_df = pd.read_csv(APPOINTMENTS_FILE, parse_dates=["Date"])
+        appt_df = pd.read_csv(APPOINTMENTS_FILE)
+        appt_df["Date"] = pd.to_datetime(appt_df["Date"], errors="coerce")
 
         # Max 20 appointments per doctor per day
         if appt_df[(appt_df["Doctor Name"] == selected_doctor_name) & 
@@ -245,10 +241,15 @@ elif menu == "📅 Book Appointment":
 # ===============================
 # AUTOMATIC REMINDERS
 # ===============================
-appt_df = pd.read_csv(APPOINTMENTS_FILE, parse_dates=["Date"])
+appt_df = pd.read_csv(APPOINTMENTS_FILE)
+appt_df["Date"] = pd.to_datetime(appt_df["Date"], errors="coerce")
+
 tomorrow = (datetime.now() + timedelta(days=1)).date()
 reminders_sent = False
+
 for idx, row in appt_df.iterrows():
+    if pd.isna(row["Date"]):
+        continue  # skip invalid dates
     appt_date = row["Date"].date()
     if appt_date == tomorrow and not row["Reminder Sent"]:
         send_mock_sms(row["Phone"], f"Reminder: Appointment with {row['Doctor Name']} tomorrow at {row['Time']}")
