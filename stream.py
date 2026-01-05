@@ -178,7 +178,7 @@ with st.sidebar.expander("📞 General Contact Numbers", expanded=False):
 # ===============================
 # CHATBOT PAGE
 # ===============================
-elif menu == "💬 Chatbot":
+if menu == "💬 Chatbot":
     st.subheader("💬 Ask the Hospital Assistant")
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
@@ -276,3 +276,4 @@ for idx, row in appt_df.iterrows():
 
 if reminders_sent:
     appt_df.to_csv(APPOINTMENTS_FILE, index=False)
+
