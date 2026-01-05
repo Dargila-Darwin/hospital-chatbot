@@ -176,7 +176,8 @@ elif menu == "📅 Book Appointment":
     st.subheader("📅 Book an Appointment")
 
     today = datetime.now().date()
-    now_time = datetime.now().time()
+    now_time = datetime.now().time().replace(second=0, microsecond=0)
+
 
     selected_date = st.date_input(
         "📆 Select Date",
@@ -189,14 +190,30 @@ elif menu == "📅 Book Appointment":
 
     available_doctors = []
     for _, r in df.iterrows():
-        raw = r["Available days"].lower()
-        allowed_days = []
-        for x in raw.split(","):
-            for d in days_list:
-                if d.startswith(x.strip()[:3]):
-                    allowed_days.append(d)
-        if any(k in raw for k in ["all","everyday","daily"]) or day_name in allowed_days:
+    raw = r["Available days"].lower().strip()
+
+    # universal keywords
+    if any(k in raw for k in ["all", "everyday", "daily"]):
+        available_doctors.append(r["Doctor Name"])
+        continue
+
+    # handle ranges like monday-friday
+    if "-" in raw or "to" in raw:
+        if day_name[:3] in raw:
             available_doctors.append(r["Doctor Name"])
+        continue
+
+    # normal comma-separated days
+    allowed_days = []
+    for x in raw.split(","):
+        x = x.strip()
+        for d in days_list:
+            if d.startswith(x[:3]):
+                allowed_days.append(d)
+
+    if day_name in allowed_days:
+        available_doctors.append(r["Doctor Name"])
+
 
     if not available_doctors:
         st.error("❌ No doctors available on selected day")
@@ -255,3 +272,4 @@ if st.session_state.is_admin:
     st.sidebar.markdown("---")
     st.sidebar.subheader("📋 Saved Appointments")
     st.sidebar.dataframe(pd.read_csv(APPOINTMENTS_FILE))
+
