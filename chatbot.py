@@ -200,47 +200,86 @@ def is_past_time(day, booking_time):
 #appointments_file = "appointments.csv"
 if not os.path.exists(APPOINTMENTS_FILE):
     pd.DataFrame(
-        columns=["Doctor Name", "Patient Name", "Day", "Time"]
+        columns=[
+            "Doctor Name",
+            "Patient Name",
+            "Phone",
+            "Date",
+            "Time",
+            "Reminder Sent"
+        ]
     ).to_csv(APPOINTMENTS_FILE, index=False)
 
 
-def book_appointment(doctor, patient, day, time_str):
+def book_appointment(doctor, patient, day, time_str, phone="N/A"):
+    # Find doctor
     row = df[df["Doctor Name"].str.lower() == doctor.lower()]
-
     if row.empty:
         return "❌ Doctor not found."
 
     row = row.iloc[0]
 
+    # Check day availability
     if not is_available_on(day, row["Available days"]):
         return f"❌ {doctor} is not available on {day.capitalize()}."
 
+    # Parse booking time
     booking_time = parse_time(time_str)
     if booking_time is None:
         return "❌ Invalid time format (use 10AM, 3PM)."
 
-    # 🔴 NEW CHECK (CRITICAL)
+    # Past time check (today only)
     if is_past_time(day, booking_time):
         return "❌ You cannot book an appointment for a past time today."
 
+    # Consultation time check
     if not is_time_within_slot(row["Consultation Time"], booking_time):
         return f"❌ Outside consultation hours ({row['Consultation Time']})."
 
+    # Convert DAY → DATE
+    today = datetime.now().date()
+    if day == today.strftime("%A").lower():
+        appt_date = today
+    else:
+        appt_date = None
+        for i in range(1, 8):
+            d = today + timedelta(days=i)
+            if d.strftime("%A").lower() == day:
+                appt_date = d
+                break
+
+    if appt_date is None:
+        return "❌ Invalid appointment date."
+
+    # Load appointments
     appt_df = pd.read_csv(APPOINTMENTS_FILE)
 
-    appt_df.loc[len(appt_df)] =  {
-    "Doctor Name": doctor,
-    "Patient Name": patient,
-    "Day": day.capitalize(),
-    "Time": time_str.upper()
-}
+    # Max 20 appointments per doctor per date
+    count = appt_df[
+        (appt_df["Doctor Name"] == doctor) &
+        (appt_df["Date"] == appt_date.isoformat())
+    ].shape[0]
+
+    if count >= 20:
+        return "❌ Slots full for this doctor on selected day."
+
+    # Save appointment (NO COLUMN MISMATCH)
+    appt_df.loc[len(appt_df)] = {
+        "Doctor Name": doctor,
+        "Patient Name": patient,
+        "Phone": phone,
+        "Date": appt_date.isoformat(),
+        "Time": time_str.upper(),
+        "Reminder Sent": False
+    }
+
     appt_df.to_csv(APPOINTMENTS_FILE, index=False)
-    print("Appointments CSV saved at:", APPOINTMENTS_FILE)
 
+    return (
+        f"✅ Appointment confirmed with **{doctor}** on "
+        f"**{appt_date.strftime('%d %B %Y')}** at **{time_str.upper()}**."
+    )
 
-
-
-    return f"✅ Appointment confirmed with **{doctor}** on **{day.capitalize()}** at **{time_str.upper()}**."
 
 # ===============================
 # RESPONSE BUILDERS
@@ -306,5 +345,6 @@ def chatbot_response(query):
 # ===============================
 def run_chatbot_query(query):
     return chatbot_response(query)
+
 
 
