@@ -93,6 +93,32 @@ border-radius:12px;">
 # SIDEBAR
 # ===============================
 st.sidebar.title("📌 PRS Hospital")
+# ---------- ADMIN LOGIN ----------
+st.sidebar.markdown("---")
+st.sidebar.subheader("🔐 Admin Login")
+
+if not st.session_state.is_admin:
+    username = st.sidebar.text_input("Username", key="admin_user")
+    password = st.sidebar.text_input("Password", type="password", key="admin_pass")
+    if st.sidebar.button("Login"):
+        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+            st.session_state.is_admin = True
+            st.sidebar.success("Admin logged in")
+        else:
+            st.sidebar.error("Invalid credentials")
+else:
+    st.sidebar.success("Admin logged in")
+    if st.sidebar.button("Logout"):
+        st.session_state.is_admin = False
+
+    # Show appointments CSV only if logged in
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📋 Saved Appointments")
+    try:
+        appt_df = pd.read_csv(APPOINTMENTS_FILE)
+        st.sidebar.dataframe(appt_df)
+    except Exception as e:
+        st.sidebar.error(f"Could not load appointments: {e}")
 menu = st.sidebar.radio(
     "Navigate",
     ["💬 Chatbot", "📅 Book Appointment", "👨‍⚕️ Doctors", "ℹ️ About"]
@@ -150,6 +176,11 @@ elif menu == "👨‍⚕️ Doctors":
                 )
 
 # ===============================
+
+# ===============================
+
+
+
 # BOOK APPOINTMENT PAGE
 # ===============================
 elif menu == "📅 Book Appointment":
@@ -286,29 +317,7 @@ with st.sidebar.expander("📞 General Contact Numbers", expanded=False):
     ]
     for num in general_numbers:
         st.markdown(f"📱 {num}")
-# ADMIN VIEW
-# ===============================
-# ---------- ADMIN (SIDEBAR) ----------
-st.sidebar.markdown("---")
-st.sidebar.subheader("🔐 Admin Login")
 
-if not st.session_state.is_admin:
-    username = st.sidebar.text_input("Username")
-    password = st.sidebar.text_input("Password", type="password")
-    if st.sidebar.button("Login"):
-        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
-            st.session_state.is_admin = True
-            st.sidebar.success("Admin logged in")
-        else:
-            st.sidebar.error("Invalid credentials")
-else:
-    st.sidebar.success("Admin logged in")
-    if st.sidebar.button("Logout"):
-        st.session_state.is_admin = False
 
-    # Admin view
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("📋 Saved Appointments")
-    st.sidebar.dataframe(pd.read_csv(APPOINTMENTS_FILE))
 
 
