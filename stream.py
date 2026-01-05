@@ -76,7 +76,7 @@ menu = st.sidebar.radio(
 )
 
 # ===============================
-# SPECIALITY FILTER (FIXED)
+# SPECIALITY FILTER
 # ===============================
 specialities = df["Speciality"].dropna().unique()
 selected_spec = st.sidebar.selectbox(
@@ -119,7 +119,6 @@ if menu == "ℹ️ About":
 # ===============================
 elif menu == "👨‍⚕️ Doctors":
     display_df = df if selected_spec == "All" else df[df["Speciality"].str.lower() == selected_spec.lower()]
-
     for _, r in display_df.iterrows():
         st.markdown(f"""
         <div style="background:#f8fafc;
@@ -140,7 +139,6 @@ elif menu == "👨‍⚕️ Doctors":
 # ===============================
 elif menu == "💬 Chatbot":
     st.subheader("💬 Ask the Hospital Assistant")
-
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
 
@@ -163,69 +161,68 @@ elif menu == "📅 Book Appointment":
     patient_name = st.text_input("👤 Patient Name")
     phone = st.text_input("📞 Phone Number")
 
-    doctors_df = df if selected_spec == "All" else df[df["Speciality"].str.lower() == selected_spec.lower()]
-    doctor = st.selectbox("👨‍⚕️ Select Doctor", sorted(doctors_df["Doctor Name"].unique()))
+    doctors = df if selected_spec == "All" else df[df["Speciality"].str.lower() == selected_spec.lower()]
+    doctor = st.selectbox("👨‍⚕️ Select Doctor", sorted(doctors["Doctor Name"].unique()))
 
     today = datetime.now().date()
     selected_date = st.date_input("📆 Select Date", min_value=today, max_value=today + timedelta(days=7))
-
     selected_time = st.time_input("⏰ Select Time", time(9, 0))
 
-    # Time range check
     if not time(9, 0) <= selected_time <= time(18, 0):
         st.error("❌ Time must be between 9 AM and 6 PM")
         st.stop()
 
-    # Past time check
-    now = datetime.now()
-    if selected_date == now.date() and selected_time <= now.time():
-        st.error("❌ Cannot book past time today")
-        st.stop()
-
     if st.button("✅ Confirm Appointment"):
+        # Validate patient details
         if not patient_name.strip():
-            st.error("❌ Enter patient name")
+            st.error("❌ Please enter patient name")
             st.stop()
-
         if not phone.isdigit() or len(phone) != 10:
-            st.error("❌ Enter valid 10-digit phone number")
+            st.error("❌ Enter a valid 10-digit phone number")
             st.stop()
 
+        # Check doctor availability
         doc_row = df[df["Doctor Name"] == doctor].iloc[0]
-        raw = doc_row["Available days"].lower().replace(" ", "")
+        raw = doc_row["Available days"].lower()
+        days = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
         day_name = selected_date.strftime("%A").lower()
 
-        days = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
+        allowed_days = []
+        for x in raw.split(","):
+            x = x.strip()
+            for d in days:
+                if d.startswith(x[:3]):
+                    allowed_days.append(d)
 
-        if any(x in raw for x in ["all", "everyday", "daily"]):
+        if any(keyword in raw for keyword in ["all", "everyday", "daily"]):
             ok = True
-        elif "-" in raw:
-            s, e = raw.split("-")
-            s = next(d for d in days if d.startswith(s[:3]))
-            e = next(d for d in days if d.startswith(e[:3]))
-            ok = days.index(s) <= days.index(day_name) <= days.index(e)
         else:
-            allowed_days = []
-
-            for x in raw.split(","):
-                x = x.strip().lower()
-                for d in days:
-                    if d.startswith(x[:3]):
-                        allowed_days.append(d)
-
-ok = day_name in allowed_days
-
+            ok = day_name in allowed_days
 
         if not ok:
-            st.error(f"❌ {doctor} not available on {selected_date.strftime('%A')}")
+            st.error(f"❌ {doctor} is not available on {selected_date.strftime('%A')}")
             st.stop()
 
+        # Prevent past date/time booking
+        if selected_date < today or (selected_date == today and selected_time <= datetime.now().time()):
+            st.error("❌ Cannot book past date or time")
+            st.stop()
+
+        # Load appointments CSV
         appt_df = pd.read_csv(APPOINTMENTS_FILE)
 
-        if appt_df[(appt_df["Doctor Name"] == doctor) & (appt_df["Date"] == selected_date.isoformat())].shape[0] >= 20:
-            st.error("❌ Slots full for this doctor on this day")
+        # Prevent duplicate booking
+        if appt_df[(appt_df["Doctor Name"] == doctor) & (appt_df["Date"] == selected_date.isoformat()) & 
+                   (appt_df["Time"] == selected_time.strftime("%I:%M%p"))].shape[0] > 0:
+            st.error("❌ Appointment already exists for this time")
             st.stop()
 
+        # Max 20 appointments per doctor per day
+        if appt_df[(appt_df["Doctor Name"] == doctor) & (appt_df["Date"] == selected_date.isoformat())].shape[0] >= 20:
+            st.error("❌ Slots full for this doctor on selected day")
+            st.stop()
+
+        # Save appointment
         appt_df.loc[len(appt_df)] = {
             "Doctor Name": doctor,
             "Patient Name": patient_name,
@@ -234,11 +231,28 @@ ok = day_name in allowed_days
             "Time": selected_time.strftime("%I:%M%p"),
             "Reminder Sent": False
         }
-
         appt_df.to_csv(APPOINTMENTS_FILE, index=False)
 
-        send_mock_sms(phone, f"Appointment confirmed with {doctor} on {selected_date} at {selected_time.strftime('%I:%M%p')}")
-        st.success("✅ Appointment booked successfully")
+        # Mock SMS confirmation
+        send_mock_sms(phone, f"Appointment confirmed with {doctor} on {selected_date.strftime('%A, %d %b')} at {selected_time.strftime('%I:%M%p')}")
+        st.success(f"✅ Appointment booked successfully with {doctor} on {selected_date.strftime('%A, %d %B')} at {selected_time.strftime('%I:%M%p')}")
+
+# ===============================
+# AUTOMATIC REMINDERS
+# ===============================
+appt_df = pd.read_csv(APPOINTMENTS_FILE)
+tomorrow = (datetime.now() + timedelta(days=1)).date()
+reminders_sent = False
+
+for idx, row in appt_df.iterrows():
+    appt_date = datetime.fromisoformat(row["Date"]).date()
+    if appt_date == tomorrow and not row["Reminder Sent"]:
+        send_mock_sms(row["Phone"], f"Reminder: Appointment with {row['Doctor Name']} tomorrow at {row['Time']}")
+        appt_df.at[idx, "Reminder Sent"] = True
+        reminders_sent = True
+
+if reminders_sent:
+    appt_df.to_csv(APPOINTMENTS_FILE, index=False)
 
 # ===============================
 # ADMIN VIEW
@@ -247,4 +261,3 @@ if st.session_state.is_admin:
     st.sidebar.markdown("---")
     st.sidebar.markdown("## 📋 Saved Appointments")
     st.sidebar.dataframe(pd.read_csv(APPOINTMENTS_FILE))
-
