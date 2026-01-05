@@ -219,7 +219,7 @@ elif menu == "📅 Book Appointment":
     patient_name = st.text_input("👤 Patient Name")
     phone = st.text_input("📞 Phone Number")
 
-    # ---- VALID CONSULTATION TIME FILTER ----
+    # ---------- VALID CONSULTATION TIME ----------
     def valid_time(t):
         try:
             start, end = t.replace(" ", "").split("-")
@@ -232,35 +232,44 @@ elif menu == "📅 Book Appointment":
     valid_doctors_df = df[df["Consultation Time"].apply(valid_time)]
 
     if valid_doctors_df.empty:
-        st.error("❌ No doctors available for online booking")
+        st.warning("⚠️ No doctors available for online booking.")
         st.stop()
 
+    # ---------- SINGLE DOCTOR SELECTBOX (FIXED) ----------
     doctor = st.selectbox(
         "👨‍⚕️ Select Doctor",
         sorted(valid_doctors_df["Doctor Name"].unique())
     )
 
-    # Get selected doctor's info (ONLY from valid doctors)
-    doc_row = valid_doctors_df[valid_doctors_df["Doctor Name"] == doctor].iloc[0]
+    # ---------- DOCTOR ROW ----------
+    doc_row = valid_doctors_df[
+        valid_doctors_df["Doctor Name"] == doctor
+    ].iloc[0]
 
-    # ---- PARSE AVAILABLE DAYS ----
+    # ---------- AVAILABLE DAYS ----------
     raw_days = doc_row["Available days"].lower().replace(" ", "")
 
     if any(x in raw_days for x in ["all", "every", "daily"]):
-        available_days = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
+        available_days = [
+            "monday","tuesday","wednesday",
+            "thursday","friday","saturday","sunday"
+        ]
     elif "-" in raw_days:
         start, end = raw_days.split("-")
-        days = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
+        days = [
+            "monday","tuesday","wednesday",
+            "thursday","friday","saturday","sunday"
+        ]
         available_days = days[days.index(start):days.index(end)+1]
     else:
-        available_days = [d.strip() for d in raw_days.split(",")]
+        available_days = raw_days.split(",")
 
-    # ---- PARSE CONSULTATION TIME ----
-    time_range = doc_row["Consultation Time"].replace(" ", "").split("-")
-    start_time = datetime.strptime(time_range[0], "%I:%M%p").time()
-    end_time = datetime.strptime(time_range[1], "%I:%M%p").time()
+    # ---------- CONSULTATION TIME ----------
+    start_str, end_str = doc_row["Consultation Time"].replace(" ", "").split("-")
+    start_time = datetime.strptime(start_str, "%I:%M%p").time()
+    end_time = datetime.strptime(end_str, "%I:%M%p").time()
 
-    # ---- VALID DATES (NEXT 7 DAYS) ----
+    # ---------- VALID DATES (NEXT 7 DAYS) ----------
     today = datetime.now().date()
     valid_dates = [
         today + timedelta(days=i)
@@ -269,13 +278,14 @@ elif menu == "📅 Book Appointment":
     ]
 
     if not valid_dates:
-        st.warning("❌ This doctor has no available days in the next 7 days.")
+        st.warning("❌ Doctor not available in next 7 days.")
         st.stop()
 
+    # ---------- DATE & TIME PICKERS (NOW WILL SHOW) ----------
     date = st.date_input("📆 Select Date", value=min(valid_dates))
-    selected_time = st.time_input("⏰ Select Time")
+    selected_time = st.time_input("⏰ Select Time", value=start_time)
 
-    # ---- CONFIRM BUTTON ----
+    # ---------- CONFIRM ----------
     if st.button("✅ Confirm Appointment"):
 
         if not patient_name.strip():
@@ -290,10 +300,11 @@ elif menu == "📅 Book Appointment":
             st.error(f"❌ {doctor} is not available on {date.strftime('%A')}")
             st.stop()
 
-        if selected_time < start_time or selected_time > end_time:
+        if not (start_time <= selected_time <= end_time):
             st.error(
                 f"❌ Time must be between "
-                f"{start_time.strftime('%I:%M %p')} and {end_time.strftime('%I:%M %p')}"
+                f"{start_time.strftime('%I:%M %p')} and "
+                f"{end_time.strftime('%I:%M %p')}"
             )
             st.stop()
 
@@ -318,6 +329,7 @@ elif menu == "📅 Book Appointment":
             "Time": time_str,
             "Reminder Sent": False
         }
+
         appt_df.to_csv(APPOINTMENTS_FILE, index=False)
 
         send_mock_sms(
@@ -341,6 +353,7 @@ if st.session_state.is_admin:
     st.sidebar.markdown("---")
     st.sidebar.subheader("📋 Saved Appointments")
     st.sidebar.dataframe(pd.read_csv(APPOINTMENTS_FILE))
+
 
 
 
