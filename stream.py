@@ -125,27 +125,32 @@ if menu == "ℹ️ About":
 elif menu == "👨‍⚕️ Doctors":
     st.subheader("👨‍⚕️ Doctor Details")
 
-    # Get selected doctor details
-    doc_row = df[df["Doctor Name"] == selected_doctor_name].iloc[0]
+    # Ensure selected doctor exists
+    doc_row = df[df["Doctor Name"] == selected_doctor_name]
 
-    # Display doctor info in a card
-    st.markdown(f"""
-    <div style="background:#f8fafc;
-    padding:20px;
-    margin-bottom:15px;
-    border-left:5px solid #2563eb;
-    border-radius:12px;
-    box-shadow: 1px 1px 5px #ccc;">
-    <h3>👨‍⚕️ {doc_row['Doctor Name']}</h3>
-    <b>Speciality:</b> {doc_row['Speciality']}<br>
-    <b>Degree:</b> {doc_row['Professional Degree']}<br>
-    <b>Consultation Time:</b> {doc_row['Consultation Time']}<br>
-    <b>Available Days:</b> {doc_row['Available days']}<br>
-    <b>Phone:</b> {doc_row['Contact']}<br>
-    <b>Email:</b> {doc_row['Email']}<br>
-    <b>Location:</b> {doc_row['Location']}
-    </div>
-    """, unsafe_allow_html=True)
+    if not doc_row.empty:
+        doc_row = doc_row.iloc[0]  # safe to get first row
+
+        st.markdown(f"""
+        <div style="background:#f8fafc;
+        padding:20px;
+        margin-bottom:15px;
+        border-left:5px solid #2563eb;
+        border-radius:12px;
+        box-shadow: 1px 1px 5px #ccc;">
+        <h3>👨‍⚕️ {doc_row['Doctor Name']}</h3>
+        <b>Speciality:</b> {doc_row['Speciality']}<br>
+        <b>Degree:</b> {doc_row.get('Professional Degree', 'N/A')}<br>
+        <b>Consultation Time:</b> {doc_row.get('Consultation Time', 'N/A')}<br>
+        <b>Available Days:</b> {doc_row.get('Available days', 'N/A')}<br>
+        <b>Phone:</b> {doc_row.get('Contact', 'N/A')}<br>
+        <b>Email:</b> {doc_row.get('Email', 'N/A')}<br>
+        <b>Location:</b> {doc_row.get('Location', 'N/A')}
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.warning("⚠️ Doctor details not found. Please check the name in the CSV.")
+
 
 # ===============================
 # CHATBOT
@@ -255,3 +260,4 @@ if st.session_state.is_admin:
     st.sidebar.markdown("---")
     st.sidebar.subheader("📋 Saved Appointments")
     st.sidebar.dataframe(pd.read_csv(APPOINTMENTS_FILE))
+
