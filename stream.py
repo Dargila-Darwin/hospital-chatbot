@@ -231,8 +231,15 @@ elif menu == "📅 Book Appointment":
             st.error("❌ Slots full")
             st.stop()
 
-        appt_df.loc[len(appt_df)] = [doctor, patient_name, phone, date.isoformat(),
-                                     selected_time.strftime("%I:%M%p"), False]
+        appt_df.loc[len(appt_df)] = {
+                        "Doctor Name": doctor,
+                        "Patient Name": patient_name,
+                        "Phone": phone,
+                        "Date": date.isoformat(),
+                        "Time": selected_time.strftime("%I:%M%p"),
+                        "Reminder Sent": False
+                        }
+
         appt_df.to_csv(APPOINTMENTS_FILE, index=False)
 
         send_mock_sms(phone, f"Appointment confirmed with {doctor}")
@@ -245,3 +252,4 @@ if st.session_state.is_admin:
     st.sidebar.markdown("---")
     st.sidebar.markdown("## 📋 Saved Appointments")
     st.sidebar.dataframe(pd.read_csv(APPOINTMENTS_FILE))
+
