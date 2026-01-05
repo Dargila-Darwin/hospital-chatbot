@@ -229,22 +229,16 @@ elif menu == "📅 Book Appointment":
     # Parse available days
     raw_days = doc_row["Available days"].lower().replace(" ", "")
 
-    day_name = datetime.now().strftime("%A").lower()  # current day (for default min)
-    
     if any(x in raw_days for x in ["all", "every", "daily"]):
         available_days = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
-    
-    elif "-" in raw_days:  # handles Monday-Friday
+    elif "-" in raw_days:
         start, end = raw_days.split("-")
         days = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
-        available_days = days[days.index(start.strip()):days.index(end.strip())+1]
-    
+        available_days = days[days.index(start):days.index(end)+1]
     else:
-        available_days = [d.strip().lower() for d in raw_days.split(",")]
-
+        available_days = [d.strip() for d in raw_days.split(",")]
 
     # Parse consultation time
-   
     try:
         time_range = doc_row["Consultation Time"].replace(" ", "").split("-")
         start_time = datetime.strptime(time_range[0], "%I:%M%p").time()
@@ -253,62 +247,82 @@ elif menu == "📅 Book Appointment":
         st.error("❌ Invalid consultation time format for this doctor")
         st.stop()
 
-    
-
-    # Calendar for date selection (only next 7 days)
+    # Valid dates (next 7 days only)
     today = datetime.now().date()
-    valid_dates = [today + timedelta(days=i) for i in range(0, 7)]
-    valid_dates = [d for d in valid_dates if d.strftime("%A").lower() in available_days]
+    valid_dates = [
+        today + timedelta(days=i)
+        for i in range(7)
+        if (today + timedelta(days=i)).strftime("%A").lower() in available_days
+    ]
 
     if not valid_dates:
         st.warning("❌ This doctor has no available days in the next 7 days.")
-    else:
-        date = st.date_input("📆 Select Date", min_value=min(valid_dates), max_value=max(valid_dates), value=min(valid_dates))
-        if date.strftime("%A").lower() not in available_days:
+        st.stop()
+
+    date = st.date_input("📆 Select Date", value=min(valid_dates))
+    selected_time = st.time_input("⏰ Select Time")
+
+    # CONFIRM BUTTON (ONLY ONE)
+    if st.button("✅ Confirm Appointment"):
+
+        # VALIDATIONS
+        if not patient_name.strip():
+            st.error("❌ Please enter patient name")
+            st.stop()
+
+        if not phone.isdigit() or len(phone) != 10:
+            st.error("❌ Enter a valid 10-digit phone number")
+            st.stop()
+
+        if date not in valid_dates:
             st.error(f"❌ {doctor} is not available on {date.strftime('%A')}")
             st.stop()
 
-        # Time picker within doctor's consultation hours
-        selected_time = st.time_input("⏰ Select Time", value=start_time)
-        if not (start_time <= selected_time <= end_time):
-            st.error(f"❌ Time must be between {start_time.strftime('%I:%M %p')} and {end_time.strftime('%I:%M %p')}")
+        if selected_time < start_time or selected_time > end_time:
+            st.error(
+                f"❌ Time must be between "
+                f"{start_time.strftime('%I:%M %p')} and {end_time.strftime('%I:%M %p')}"
+            )
             st.stop()
 
         time_str = selected_time.strftime("%I:%M%p").lstrip("0")
 
-        # Confirm appointment
-        if st.button("✅ Confirm Appointment"):
-            if not patient_name.strip():
-                st.error("❌ Please enter patient name")
-                st.stop()
-            if not phone.isdigit() or len(phone) != 10:
-                st.error("❌ Enter a valid 10-digit phone number")
-                st.stop()
+        # Load appointments
+        appt_df = pd.read_csv(APPOINTMENTS_FILE)
 
-            # Load appointments
-            appt_df = pd.read_csv(APPOINTMENTS_FILE)
+        # Max 20 appointments per doctor per day
+        count = appt_df[
+            (appt_df["Doctor Name"] == doctor) &
+            (appt_df["Date"] == date.isoformat())
+        ].shape[0]
 
-            # Max 20 appointments per doctor per day
-            count = appt_df[(appt_df["Doctor Name"] == doctor) & (appt_df["Date"] == date.isoformat())].shape[0]
-            if count >= 20:
-                st.error("❌ Slots full for this doctor on selected day")
-                st.stop()
+        if count >= 20:
+            st.error("❌ Slots full for this doctor on selected day")
+            st.stop()
 
-            # Save appointment
-            appt_df.loc[len(appt_df)] = {
-                "Doctor Name": doctor,
-                "Patient Name": patient_name,
-                "Phone": phone,
-                "Date": date.isoformat(),
-                "Time": time_str,
-                "Reminder Sent": False
-            }
-            appt_df.to_csv(APPOINTMENTS_FILE, index=False)
+        # Save appointment
+        appt_df.loc[len(appt_df)] = {
+            "Doctor Name": doctor,
+            "Patient Name": patient_name,
+            "Phone": phone,
+            "Date": date.isoformat(),
+            "Time": time_str,
+            "Reminder Sent": False
+        }
+        appt_df.to_csv(APPOINTMENTS_FILE, index=False)
 
-            # Mock SMS confirmation
-            send_mock_sms(phone, f"PRS Hospital: Appointment confirmed with {doctor} on {date.strftime('%d %b')} at {time_str}.")
-            st.success(f"✅ Appointment confirmed with {doctor} on {date.strftime('%d %B')} at {time_str}")
-            st.info("📩 Confirmation SMS sent (simulated)")
+        # SMS + success
+        send_mock_sms(
+            phone,
+            f"PRS Hospital: Appointment confirmed with {doctor} "
+            f"on {date.strftime('%d %b')} at {time_str}."
+        )
+
+        st.success(
+            f"✅ Appointment confirmed with {doctor} "
+            f"on {date.strftime('%d %B')} at {time_str}"
+        )
+
 
 
 # ===============================
@@ -318,4 +332,5 @@ if st.session_state.is_admin:
     st.sidebar.markdown("---")
     st.sidebar.subheader("📋 Saved Appointments")
     st.sidebar.dataframe(pd.read_csv(APPOINTMENTS_FILE))
+
 
