@@ -97,7 +97,7 @@ if st.session_state.is_admin:
 # Main menu
 menu = st.sidebar.radio(
     "Navigate",
-    ["💬 Chatbot", "📅 Book Appointment", "ℹ️ About"]
+    ["💬 Chatbot", "📅 Book Appointment", "👨‍⚕️ Doctors", "ℹ️ About"]
 )
 
 # ===============================
@@ -111,74 +111,16 @@ if menu == "ℹ️ About":
     ✔ Online appointment booking  
     """)
 
-# Hospital Info
-with st.sidebar.expander("🏥 Hospital Info", expanded=True):
-    st.markdown("""
-    **PRS Hospital**  
-    Killipalam,  
-    Thiruvananthapuram,  
-    Kerala – 695002
-    """)
-
-# Specialities
-with st.sidebar.expander("🩺 Specialities", expanded=False):
-    st.markdown("""
-    - Cardiologist  
-    - ENT  
-    - Gastroenterologist  
-    - Gynecologist  
-    - Nephrologist  
-    - Neurologist  
-    - Urologist  
-    - Pulmonologist  
-    - Dermatologist  
-    - Ophthalmologist  
-    - Orthopaedician  
-    - Oncologist  
-    - Pathologist  
-    - Radiologist  
-    - Psychiatrist  
-    - Psychologist  
-    - Endocrinologist  
-    - General Surgeon  
-    - Paediatrician  
-    """)
-
-# Appointment Booking Contacts
-with st.sidebar.expander("📅 Book Appointment Contacts", expanded=True):
-    appointment_numbers = [
-        "+91 9876543210",
-        "+91 9678547645",
-        "+91 9234765840"
-    ]
-    for num in appointment_numbers:
-        st.markdown(f"📞 {num}")
-        st.markdown(f"[Call {num}](tel:{num.replace(' ', '')})")
-
-# Emergency Numbers
-with st.sidebar.expander("🚨 Emergency Numbers", expanded=False):
-    emergency_numbers = [
-        "+91 9678768843",
-        "+91 9568746574"
-    ]
-    for num in emergency_numbers:
-        st.markdown(f"⚠️ **{num}**")
-
-# General Contact Numbers
-with st.sidebar.expander("📞 General Contact Numbers", expanded=False):
-    general_numbers = [
-        "+91 9448123456",
-        "+91 9448234567"
-    ]
-    for num in general_numbers:
-        st.markdown(f"📱 {num}")
 # ===============================
-
+# DOCTORS PAGE (NO CARDS)
+# ===============================
+elif menu == "👨‍⚕️ Doctors":
+    st.info("This page lists the doctors in our hospital. Details are not displayed here.")
 
 # ===============================
 # CHATBOT PAGE
 # ===============================
-if menu == "💬 Chatbot":
+elif menu == "💬 Chatbot":
     st.subheader("💬 Ask the Hospital Assistant")
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
@@ -276,4 +218,3 @@ for idx, row in appt_df.iterrows():
 
 if reminders_sent:
     appt_df.to_csv(APPOINTMENTS_FILE, index=False)
-
