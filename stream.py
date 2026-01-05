@@ -26,9 +26,13 @@ if not os.path.exists(APPOINTMENTS_FILE):
 # ===============================
 from chatbot import run_chatbot_query, df
 
-df["Doctor Name"] = df["Doctor Name"].str.strip()
-df["Speciality"] = df["Speciality"].str.strip()
-df["Available days"] = df["Available days"].str.strip()
+# Strip whitespace and ensure all columns exist
+required_cols = ["Doctor Name", "Speciality", "Professional Degree", "Consultation Time",
+                 "Available days", "Contact", "Email", "Location"]
+for col in required_cols:
+    if col not in df.columns:
+        df[col] = "N/A"
+    df[col] = df[col].astype(str).str.strip()
 
 # ===============================
 # ADMIN AUTH
@@ -39,7 +43,7 @@ if "is_admin" not in st.session_state:
     st.session_state.is_admin = False
 
 # ===============================
-# MOCK SMS (UI VISIBLE)
+# MOCK SMS
 # ===============================
 def send_mock_sms(phone, message):
     st.info(f"📩 SMS sent to **{phone}**\n\n{message}")
@@ -50,7 +54,7 @@ def send_mock_sms(phone, message):
 st.set_page_config(
     page_title="PRS Hospital Assistant",
     page_icon="🏥",
-    layout="centered"
+    layout="wide"
 )
 
 # ===============================
@@ -67,41 +71,42 @@ border-radius:12px;">
 """, unsafe_allow_html=True)
 
 # ===============================
-# SIDEBAR MENU
+# SIDEBAR
 # ===============================
 st.sidebar.title("📌 PRS Hospital")
-menu = st.sidebar.radio(
-    "Navigate",
-    ["💬 Chatbot", "📅 Book Appointment", "👨‍⚕️ Doctors", "ℹ️ About"]
-)
+
+# Patient Info in Sidebar
+st.sidebar.subheader("👤 Patient Details")
+patient_name = st.sidebar.text_input("Patient Name")
+phone = st.sidebar.text_input("Phone Number")
 
 # ===============================
-# SPECIALITY FILTER
+# DOCTOR SELECTION IN SIDEBAR
 # ===============================
-specialities = df["Speciality"].dropna().unique()
-selected_spec = st.sidebar.selectbox(
-    "🩺 Filter by Speciality",
-    ["All"] + sorted(specialities)
-)
+st.sidebar.subheader("👨‍⚕️ Select Doctor")
+selected_doctor_name = st.sidebar.selectbox("Choose Doctor", sorted(df["Doctor Name"].unique()))
 
-# ===============================
-# ADMIN LOGIN
-# ===============================
+# Admin Login
 st.sidebar.markdown("---")
-st.sidebar.markdown("## 🔐 Admin Login")
-
-username = st.sidebar.text_input("Username")
-password = st.sidebar.text_input("Password", type="password")
-
+st.sidebar.subheader("🔐 Admin Login")
+username = st.sidebar.text_input("Username", key="admin_user")
+password = st.sidebar.text_input("Password", type="password", key="admin_pass")
 if st.sidebar.button("Login"):
     if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
         st.session_state.is_admin = True
         st.sidebar.success("Admin logged in")
     else:
         st.sidebar.error("Invalid credentials")
-
 if st.session_state.is_admin:
     st.sidebar.button("Logout", on_click=lambda: st.session_state.update({"is_admin": False}))
+
+# ===============================
+# MAIN MENU
+# ===============================
+menu = st.sidebar.radio(
+    "Navigate",
+    ["💬 Chatbot", "📅 Book Appointment", "👨‍⚕️ Doctors", "ℹ️ About"]
+)
 
 # ===============================
 # ABOUT
@@ -118,53 +123,29 @@ if menu == "ℹ️ About":
 # DOCTORS PAGE
 # ===============================
 elif menu == "👨‍⚕️ Doctors":
-    st.markdown(
-        """
-        <h2 style="
-            text-align:center;
-            color:#1e3a8a;
-            font-weight:800;
-            margin-bottom:20px;
-        ">
-            👨‍⚕️ Our Expert Doctors
-        </h2>
-        """,
-        unsafe_allow_html=True
-    )
+    st.subheader("👨‍⚕️ Doctor Details")
 
-    for _, r in df.iterrows():
-        st.markdown(
-            f"""
-            <div style="
-                width:100%;
-                background-color:#f8fafc;
-                padding:18px;
-                margin-bottom:15px;
-                border-left:6px solid #2563eb;
-                border-radius:12px;
-                box-shadow:0 4px 10px rgba(0,0,0,0.08);
-            ">
-                <div style="font-size:20px; font-weight:800; color:#0f172a;">
-                    🧑‍⚕️ {r['Doctor Name']}
-                </div>
-                <div style="margin-top:6px;">
-                    🩺 <b>Speciality:</b> {r['Speciality']}
-                </div>
-                <div>
-                    ⏰ <b>Consultation Time:</b> {r['Consultation Time']}
-                </div>
-                <div>
-                    📅 <b>Available Days:</b> {r['Available days']}
-                </div>
-                <div>
-                    📍 <b>Location:</b> {r['Location']}
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+    # Get selected doctor details
+    doc_row = df[df["Doctor Name"] == selected_doctor_name].iloc[0]
 
-
+    # Display doctor info in a card
+    st.markdown(f"""
+    <div style="background:#f8fafc;
+    padding:20px;
+    margin-bottom:15px;
+    border-left:5px solid #2563eb;
+    border-radius:12px;
+    box-shadow: 1px 1px 5px #ccc;">
+    <h3>👨‍⚕️ {doc_row['Doctor Name']}</h3>
+    <b>Speciality:</b> {doc_row['Speciality']}<br>
+    <b>Degree:</b> {doc_row['Professional Degree']}<br>
+    <b>Consultation Time:</b> {doc_row['Consultation Time']}<br>
+    <b>Available Days:</b> {doc_row['Available days']}<br>
+    <b>Phone:</b> {doc_row['Contact']}<br>
+    <b>Email:</b> {doc_row['Email']}<br>
+    <b>Location:</b> {doc_row['Location']}
+    </div>
+    """, unsafe_allow_html=True)
 
 # ===============================
 # CHATBOT
@@ -174,15 +155,14 @@ elif menu == "💬 Chatbot":
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
 
-    user_input = st.text_input("Type your question")
-
+    user_input = st.text_input("Type your question here")
     if st.button("Send") and user_input.strip():
         reply = run_chatbot_query(user_input)
         st.session_state.chat_history.append(("You", user_input))
         st.session_state.chat_history.append(("Bot", reply))
 
     for role, msg in st.session_state.chat_history:
-        st.markdown(f"**{role}:** {msg}", unsafe_allow_html=True)
+        st.markdown(f"**{role}:** {msg}")
 
 # ===============================
 # BOOK APPOINTMENT
@@ -190,22 +170,12 @@ elif menu == "💬 Chatbot":
 elif menu == "📅 Book Appointment":
     st.subheader("📅 Book an Appointment")
 
-    patient_name = st.text_input("👤 Patient Name")
-    phone = st.text_input("📞 Phone Number")
-
-    doctors = df if selected_spec == "All" else df[df["Speciality"].str.lower() == selected_spec.lower()]
-    doctor = st.selectbox("👨‍⚕️ Select Doctor", sorted(doctors["Doctor Name"].unique()))
-
     today = datetime.now().date()
     selected_date = st.date_input("📆 Select Date", min_value=today, max_value=today + timedelta(days=7))
     selected_time = st.time_input("⏰ Select Time", time(9, 0))
 
-    if not time(9, 0) <= selected_time <= time(18, 0):
-        st.error("❌ Time must be between 9 AM and 6 PM")
-        st.stop()
-
     if st.button("✅ Confirm Appointment"):
-        # Validate patient details
+        # Validate patient info
         if not patient_name.strip():
             st.error("❌ Please enter patient name")
             st.stop()
@@ -214,7 +184,7 @@ elif menu == "📅 Book Appointment":
             st.stop()
 
         # Check doctor availability
-        doc_row = df[df["Doctor Name"] == doctor].iloc[0]
+        doc_row = df[df["Doctor Name"] == selected_doctor_name].iloc[0]
         raw = doc_row["Available days"].lower()
         days = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
         day_name = selected_date.strftime("%A").lower()
@@ -225,17 +195,16 @@ elif menu == "📅 Book Appointment":
             for d in days:
                 if d.startswith(x[:3]):
                     allowed_days.append(d)
-
         if any(keyword in raw for keyword in ["all", "everyday", "daily"]):
             ok = True
         else:
             ok = day_name in allowed_days
 
         if not ok:
-            st.error(f"❌ {doctor} is not available on {selected_date.strftime('%A')}")
+            st.error(f"❌ {selected_doctor_name} is not available on {selected_date.strftime('%A')}")
             st.stop()
 
-        # Prevent past date/time booking
+        # Prevent past date/time
         if selected_date < today or (selected_date == today and selected_time <= datetime.now().time()):
             st.error("❌ Cannot book past date or time")
             st.stop()
@@ -243,20 +212,14 @@ elif menu == "📅 Book Appointment":
         # Load appointments CSV
         appt_df = pd.read_csv(APPOINTMENTS_FILE)
 
-        # Prevent duplicate booking
-        if appt_df[(appt_df["Doctor Name"] == doctor) & (appt_df["Date"] == selected_date.isoformat()) & 
-                   (appt_df["Time"] == selected_time.strftime("%I:%M%p"))].shape[0] > 0:
-            st.error("❌ Appointment already exists for this time")
-            st.stop()
-
         # Max 20 appointments per doctor per day
-        if appt_df[(appt_df["Doctor Name"] == doctor) & (appt_df["Date"] == selected_date.isoformat())].shape[0] >= 20:
+        if appt_df[(appt_df["Doctor Name"] == selected_doctor_name) & (appt_df["Date"] == selected_date.isoformat())].shape[0] >= 20:
             st.error("❌ Slots full for this doctor on selected day")
             st.stop()
 
         # Save appointment
         appt_df.loc[len(appt_df)] = {
-            "Doctor Name": doctor,
+            "Doctor Name": selected_doctor_name,
             "Patient Name": patient_name,
             "Phone": phone,
             "Date": selected_date.isoformat(),
@@ -265,9 +228,9 @@ elif menu == "📅 Book Appointment":
         }
         appt_df.to_csv(APPOINTMENTS_FILE, index=False)
 
-        # Mock SMS confirmation
-        send_mock_sms(phone, f"Appointment confirmed with {doctor} on {selected_date.strftime('%A, %d %b')} at {selected_time.strftime('%I:%M%p')}")
-        st.success(f"✅ Appointment booked successfully with {doctor} on {selected_date.strftime('%A, %d %B')} at {selected_time.strftime('%I:%M%p')}")
+        # Mock SMS
+        send_mock_sms(phone, f"Appointment confirmed with {selected_doctor_name} on {selected_date.strftime('%A, %d %b')} at {selected_time.strftime('%I:%M%p')}")
+        st.success(f"✅ Appointment booked successfully with {selected_doctor_name} on {selected_date.strftime('%A, %d %B')} at {selected_time.strftime('%I:%M%p')}")
 
 # ===============================
 # AUTOMATIC REMINDERS
@@ -275,7 +238,6 @@ elif menu == "📅 Book Appointment":
 appt_df = pd.read_csv(APPOINTMENTS_FILE)
 tomorrow = (datetime.now() + timedelta(days=1)).date()
 reminders_sent = False
-
 for idx, row in appt_df.iterrows():
     appt_date = datetime.fromisoformat(row["Date"]).date()
     if appt_date == tomorrow and not row["Reminder Sent"]:
@@ -286,64 +248,10 @@ for idx, row in appt_df.iterrows():
 if reminders_sent:
     appt_df.to_csv(APPOINTMENTS_FILE, index=False)
 
-with st.sidebar.expander("🩺 Specialities", expanded=False):
-    st.markdown("""
-    - Cardiologist  
-    - ENT  
-    - Gastroenterologist  
-    - Gynecologist  
-    - Nephrologist  
-    - Neurologist  
-    - Urologist  
-    - Pulmonologist  
-    - Dermatologist  
-    - Ophthalmologist  
-    - Orthopaedician  
-    - Oncologist  
-    - Pathologist  
-    - Radiologist  
-    - Psychiatrist  
-    - Psychologist  
-    - Endocrinologist  
-    - General Surgeon  
-    - Paediatrician  
-    """)
-
-# Appointment Booking Contacts
-with st.sidebar.expander("📅 Book Appointment Contacts", expanded=True):
-    appointment_numbers = [
-        "+91 9876543210",
-        "+91 9678547645",
-        "+91 9234765840"
-    ]
-    for num in appointment_numbers:
-        st.markdown(f"📞 {num}")
-        st.markdown(f"[Call {num}](tel:{num.replace(' ', '')})")
-
-# Emergency Numbers
-with st.sidebar.expander("🚨 Emergency Numbers", expanded=False):
-    emergency_numbers = [
-        "+91 9678768843",
-        "+91 9568746574"
-    ]
-    for num in emergency_numbers:
-        st.markdown(f"⚠️ **{num}**")
-
-# General Contact Numbers
-with st.sidebar.expander("📞 General Contact Numbers", expanded=False):
-    general_numbers = [
-        "+91 9448123456",
-        "+91 9448234567"
-    ]
-    for num in general_numbers:
-        st.markdown(f"📱 {num}")
-
-
 # ===============================
 # ADMIN VIEW
 # ===============================
 if st.session_state.is_admin:
     st.sidebar.markdown("---")
-    st.sidebar.markdown("## 📋 Saved Appointments")
+    st.sidebar.subheader("📋 Saved Appointments")
     st.sidebar.dataframe(pd.read_csv(APPOINTMENTS_FILE))
-
