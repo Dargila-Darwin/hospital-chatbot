@@ -118,21 +118,53 @@ if menu == "ℹ️ About":
 # DOCTORS PAGE
 # ===============================
 elif menu == "👨‍⚕️ Doctors":
-    display_df = df if selected_spec == "All" else df[df["Speciality"].str.lower() == selected_spec.lower()]
-    for _, r in display_df.iterrows():
-        st.markdown(f"""
-        <div style="background:#f8fafc;
-        padding:15px;
-        margin-bottom:10px;
-        border-left:5px solid #2563eb;
-        border-radius:10px;">
-        <b>👨‍⚕️ {r['Doctor Name']}</b><br>
-        🩺 {r['Speciality']}<br>
-        ⏰ {r['Consultation Time']}<br>
-        📅 {r['Available days']}<br>
-        📍 {r['Location']}
-        </div>
-        """, unsafe_allow_html=True)
+    st.markdown(
+        """
+        <h2 style="
+            text-align:center;
+            color:#1e3a8a;
+            font-weight:800;
+            margin-bottom:20px;
+        ">
+            👨‍⚕️ Our Expert Doctors
+        </h2>
+        """,
+        unsafe_allow_html=True
+    )
+
+    for _, r in df.iterrows():
+        st.markdown(
+            f"""
+            <div style="
+                width:100%;
+                background-color:#f8fafc;
+                padding:18px;
+                margin-bottom:15px;
+                border-left:6px solid #2563eb;
+                border-radius:12px;
+                box-shadow:0 4px 10px rgba(0,0,0,0.08);
+            ">
+                <div style="font-size:20px; font-weight:800; color:#0f172a;">
+                    🧑‍⚕️ {r['Doctor Name']}
+                </div>
+                <div style="margin-top:6px;">
+                    🩺 <b>Speciality:</b> {r['Speciality']}
+                </div>
+                <div>
+                    ⏰ <b>Consultation Time:</b> {r['Consultation Time']}
+                </div>
+                <div>
+                    📅 <b>Available Days:</b> {r['Available days']}
+                </div>
+                <div>
+                    📍 <b>Location:</b> {r['Location']}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+
 
 # ===============================
 # CHATBOT
@@ -254,6 +286,59 @@ for idx, row in appt_df.iterrows():
 if reminders_sent:
     appt_df.to_csv(APPOINTMENTS_FILE, index=False)
 
+with st.sidebar.expander("🩺 Specialities", expanded=False):
+    st.markdown("""
+    - Cardiologist  
+    - ENT  
+    - Gastroenterologist  
+    - Gynecologist  
+    - Nephrologist  
+    - Neurologist  
+    - Urologist  
+    - Pulmonologist  
+    - Dermatologist  
+    - Ophthalmologist  
+    - Orthopaedician  
+    - Oncologist  
+    - Pathologist  
+    - Radiologist  
+    - Psychiatrist  
+    - Psychologist  
+    - Endocrinologist  
+    - General Surgeon  
+    - Paediatrician  
+    """)
+
+# Appointment Booking Contacts
+with st.sidebar.expander("📅 Book Appointment Contacts", expanded=True):
+    appointment_numbers = [
+        "+91 9876543210",
+        "+91 9678547645",
+        "+91 9234765840"
+    ]
+    for num in appointment_numbers:
+        st.markdown(f"📞 {num}")
+        st.markdown(f"[Call {num}](tel:{num.replace(' ', '')})")
+
+# Emergency Numbers
+with st.sidebar.expander("🚨 Emergency Numbers", expanded=False):
+    emergency_numbers = [
+        "+91 9678768843",
+        "+91 9568746574"
+    ]
+    for num in emergency_numbers:
+        st.markdown(f"⚠️ **{num}**")
+
+# General Contact Numbers
+with st.sidebar.expander("📞 General Contact Numbers", expanded=False):
+    general_numbers = [
+        "+91 9448123456",
+        "+91 9448234567"
+    ]
+    for num in general_numbers:
+        st.markdown(f"📱 {num}")
+
+
 # ===============================
 # ADMIN VIEW
 # ===============================
@@ -261,3 +346,4 @@ if st.session_state.is_admin:
     st.sidebar.markdown("---")
     st.sidebar.markdown("## 📋 Saved Appointments")
     st.sidebar.dataframe(pd.read_csv(APPOINTMENTS_FILE))
+
