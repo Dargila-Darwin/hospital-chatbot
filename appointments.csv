@@ -1,0 +1,14 @@
+Doctor Name,Patient Name,Phone,Date,Time,Reminder,,,,,,
+,,,,,,,,,,,
+,,,,,,,,,,,
+Dr. Krishna Kumar K,aaa,1234567896,Tuesday,,,,,,,,
+Dr. Krishna Kumar K,aaa,1234567867,Tuesday,,,,,,,,
+Dr. Prakash N Nair,ddd,987654321,Tuesday,,,,,,,,
+,,,,,,,,,,,{
+,,,,,,,,,,,"    ""Doctor Name"": doctor,"
+,,,,,,,,,,,"    ""Patient Name"": patient_name,"
+,,,,,,,,,,,"    ""Phone"": phone,"
+,,,,,,,,,,,"    ""Date"": date.isoformat(),"
+,,,,,,,,,,,"    ""Time"": selected_time.strftime(""%I:%M%p""),"
+,,,,,,,,,,,"    ""Reminder Sent"": False"
+,,,,,,,,,,,}
