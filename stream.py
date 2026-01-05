@@ -24,7 +24,7 @@ if not os.path.exists(APPOINTMENTS_FILE):
 # ===============================
 # IMPORT CHATBOT & DOCTORS DATA
 # ===============================
-from chatbot import run_chatbot_query, df
+from chatbot import run_chatbot_query, df, availability_on_day_for_specialty
 
 # Strip whitespace and ensure all columns exist
 required_cols = ["Doctor Name", "Speciality", "Professional Degree", "Consultation Time",
@@ -122,52 +122,6 @@ if menu == "ℹ️ About":
 # ===============================
 # DOCTORS PAGE
 # ===============================
-elif menu == "👨‍⚕️ Doctors":
-    st.markdown(
-        """
-        <h2 style="
-            text-align:center;
-            color:#1e3a8a;
-            font-weight:800;
-            margin-bottom:20px;
-        ">
-            👨‍⚕️ Our Expert Doctors
-        </h2>
-        """,
-        unsafe_allow_html=True
-    )
-
-    for _, r in df.iterrows():
-        st.markdown(
-            f"""
-            <div style="
-                width:100%;
-                background-color:#f8fafc;
-                padding:18px;
-                margin-bottom:15px;
-                border-left:6px solid #2563eb;
-                border-radius:12px;
-                box-shadow:0 4px 10px rgba(0,0,0,0.08);
-            ">
-                <div style="font-size:20px; font-weight:800; color:#0f172a;">
-                    🧑‍⚕️ {r['Doctor Name']}
-                </div>
-                <div style="margin-top:6px;">
-                    🩺 <b>Speciality:</b> {r['Speciality']}
-                </div>
-                <div>
-                    ⏰ <b>Consultation Time:</b> {r['Consultation Time']}
-                </div>
-                <div>
-                    📅 <b>Available Days:</b> {r['Available days']}
-                </div>
-                <div>
-                    📍 <b>Location:</b> {r['Location']}
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
 
 # ===============================
 # CHATBOT
@@ -330,5 +284,6 @@ if st.session_state.is_admin:
     st.sidebar.markdown("---")
     st.sidebar.subheader("📋 Saved Appointments")
     st.sidebar.dataframe(pd.read_csv(APPOINTMENTS_FILE))
+
 
 
