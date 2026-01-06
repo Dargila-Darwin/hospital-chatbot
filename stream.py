@@ -44,37 +44,59 @@ def send_mock_sms(phone, message):
 # ===============================
 # TIME PARSING FUNCTION (NEW)
 # ===============================
-def parse_time_range(time_str):
-    time_str = time_str.strip().lower().replace(" ", "").replace("to", "-")
+def parse_consultation_ranges(text):
+    """
+    Supports:
+    9.30AM to 1.30 PM
+    4PM - 7PM
+    9 AM to 4 PM
+    10.30AM to 2PM
+    9am to 2pm
+    """
 
-    if "-" not in time_str:
-        raise ValueError("Invalid consultation time format")
+    text = text.lower().replace("–", "-").replace("—", "-")
 
-    start_str, end_str = time_str.split("-")
+    # Split multiple sessions (newline or comma)
+    parts = re.split(r"\n|,", text)
 
-    def parse_single(t):
-        t = t.replace(".", ":")  # 10.30am → 10:30am
+    ranges = []
 
-        if re.match(r"^\d{1,2}(am|pm)$", t):
-            t = t[:-2] + ":00" + t[-2:]
+    for part in parts:
+        part = part.strip()
+        if not part:
+            continue
 
-        return datetime.strptime(t, "%I:%M%p").time()
+        part = part.replace("to", "-").replace(" ", "")
 
-    start_time = parse_single(start_str)
-    end_time = parse_single(end_str)
+        if "-" not in part:
+            continue
 
-    # Hospital working hours
-    HOSPITAL_START = time(9, 0)   # 9:00 AM
-    HOSPITAL_END   = time(18, 0)  # 6:00 PM
+        start_raw, end_raw = part.split("-")
 
-    # Final allowed range = doctor ∩ hospital
-    start_time = max(start_time, HOSPITAL_START)
-    end_time = min(end_time, HOSPITAL_END)
+        def fix(t):
+            t = t.replace(".", ":")
+            if re.match(r"^\d{1,2}(am|pm)$", t):
+                t = t[:-2] + ":00" + t[-2:]
+            return datetime.strptime(t, "%I:%M%p").time()
 
-    if start_time >= end_time:
-        raise ValueError("Doctor not available during hospital hours")
+        start = fix(start_raw)
+        end = fix(end_raw)
 
-    return start_time, end_time
+        # Enforce hospital timing
+        HOSPITAL_START = time(9, 0)
+        HOSPITAL_END = time(18, 0)
+
+        start = max(start, HOSPITAL_START)
+        end = min(end, HOSPITAL_END)
+
+        if start < end:
+            ranges.append((start, end))
+
+    if not ranges:
+        raise ValueError("Invalid consultation time")
+
+    return ranges
+
 
 
 # ===============================
@@ -219,7 +241,10 @@ elif menu == "📅 Book Appointment":
     # ===============================
     # FIXED TIME PARSING
     # ===============================
-    start_time, end_time = parse_time_range(doc_row["Consultation Time"])
+    consultation_ranges = parse_consultation_ranges(
+        doc_row["Consultation Time"]
+    )
+
 
     # Calendar for date selection
     today = datetime.now().date()
@@ -229,12 +254,30 @@ elif menu == "📅 Book Appointment":
     if not valid_dates:
         st.warning("❌ This doctor has no available days in the next 7 days.")
     else:
-        date = st.date_input("📆 Select Date", min_value=min(valid_dates), max_value=max(valid_dates), value=min(valid_dates))
-        selected_time = st.time_input("⏰ Select Time", value=start_time)
-        if not (start_time <= selected_time <= end_time):
-            st.error(f"❌ Time must be between {start_time.strftime('%I:%M %p')} and {end_time.strftime('%I:%M %p')}")
+        date = st.date_input(
+            "📆 Select Date",
+            min_value=min(valid_dates),
+            max_value=max(valid_dates),
+            value=min(valid_dates)
+        )
+    
+        selected_time = st.time_input(
+            "⏰ Select Time",
+            value=consultation_ranges[0][0]
+        )
+    
+        # ✅ Validate selected time
+        if not any(start <= selected_time <= end for start, end in consultation_ranges):
+            allowed = ", ".join(
+                f"{s.strftime('%I:%M %p')}–{e.strftime('%I:%M %p')}"
+                for s, e in consultation_ranges
+            )
+            st.error(f"❌ Allowed time: {allowed}")
             st.stop()
+    
         time_str = selected_time.strftime("%I:%M%p").lstrip("0")
+
+
 
         if st.button("✅ Confirm Appointment"):
             if not patient_name.strip():
@@ -327,6 +370,7 @@ with st.sidebar.expander("📞 General Contact Numbers", expanded=False):
     ]
     for num in general_numbers:
         st.markdown(f"📱 {num}")
+
 
 
 
