@@ -270,6 +270,9 @@ elif menu == "📅 Book Appointment":
             st.warning("⚠️ No more available slots today. Please choose another day.")
             st.stop()
         selected_time = st.time_input("⏰ Select Time", value=future_slots[0])
+        if selected_time < datetime.now().time():
+            st.error("❌ Cannot book a time in the past today")
+            st.stop()
     else:
         selected_time = st.time_input("⏰ Select Time", value=consultation_ranges[0][0])
 
@@ -376,6 +379,7 @@ with st.sidebar.expander("📞 General Contact Numbers", expanded=False):
     ]
     for num in general_numbers:
         st.markdown(f"📱 {num}")
+
 
 
 
