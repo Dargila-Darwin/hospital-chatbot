@@ -45,27 +45,37 @@ def send_mock_sms(phone, message):
 # TIME PARSING FUNCTION (NEW)
 # ===============================
 def parse_time_range(time_str):
-    """
-    Parses time ranges like '9am to 2pm', '09:00AM-02:00PM', '10am-5pm'
-    Returns (start_time, end_time) as datetime.time objects
-    """
     time_str = time_str.strip().lower().replace(" ", "").replace("to", "-")
-    
+
     if "-" not in time_str:
         raise ValueError("Invalid consultation time format")
-    
+
     start_str, end_str = time_str.split("-")
-    
+
     def parse_single(t):
-        # Add :00 if missing (e.g., 9am -> 9:00am)
+        t = t.replace(".", ":")  # 10.30am → 10:30am
+
         if re.match(r"^\d{1,2}(am|pm)$", t):
             t = t[:-2] + ":00" + t[-2:]
+
         return datetime.strptime(t, "%I:%M%p").time()
-    
+
     start_time = parse_single(start_str)
     end_time = parse_single(end_str)
-    
+
+    # Hospital working hours
+    HOSPITAL_START = time(9, 0)   # 9:00 AM
+    HOSPITAL_END   = time(18, 0)  # 6:00 PM
+
+    # Final allowed range = doctor ∩ hospital
+    start_time = max(start_time, HOSPITAL_START)
+    end_time = min(end_time, HOSPITAL_END)
+
+    if start_time >= end_time:
+        raise ValueError("Doctor not available during hospital hours")
+
     return start_time, end_time
+
 
 # ===============================
 # PAGE CONFIG
@@ -317,6 +327,7 @@ with st.sidebar.expander("📞 General Contact Numbers", expanded=False):
     ]
     for num in general_numbers:
         st.markdown(f"📱 {num}")
+
 
 
 
