@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta, time
 import os
-import re  # <-- new import for time parsing
+import re  
 
 # ===============================
 # FILE SETUP
@@ -234,10 +234,14 @@ elif menu == "📅 Book Appointment":
         # Case 1: doctor is available all days
         available_days = all_days
     elif "not available on" in raw_days:
-        # Case 2: doctor specified unavailable days
-        # Extract all weekdays from the string
-        excluded = re.findall(r"monday|tuesday|wednesday|thursday|friday|saturday|sunday", raw_days)
-        available_days = [d for d in all_days if d not in excluded]
+        # Find days mentioned after 'not available on'
+        match = re.search(r"not available on (.+)", raw_days)
+        if match:
+            excluded = [d.strip() for d in re.split(r",|;", match.group(1))]
+            available_days = [d for d in all_days if d not in excluded]
+        else:
+            available_days = all_days  # fallback
+
     else:
         # Case 3: comma separated available days (fallback)
         # Normalize, remove spaces, and keep only valid weekdays
@@ -378,6 +382,7 @@ with st.sidebar.expander("📞 General Contact Numbers", expanded=False):
     ]
     for num in general_numbers:
         st.markdown(f"📱 {num}")
+
 
 
 
