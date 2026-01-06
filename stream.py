@@ -228,15 +228,22 @@ elif menu == "📅 Book Appointment":
     raw_days = doc_row["Available days"].lower().strip()
     all_days = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
     
+    available_days = []
+    
     if "available all days" in raw_days:
+        # Case 1: doctor is available all days
         available_days = all_days
     elif "not available on" in raw_days:
-        # Extract the days after "not available on"
+        # Case 2: doctor specified unavailable days
+        # Extract all weekdays from the string
         excluded = re.findall(r"monday|tuesday|wednesday|thursday|friday|saturday|sunday", raw_days)
         available_days = [d for d in all_days if d not in excluded]
     else:
-        # Fallback: assume comma separated available days
-        available_days = [d.strip() for d in raw_days.split(",") if d.strip() in all_days]
+        # Case 3: comma separated available days (fallback)
+        # Normalize, remove spaces, and keep only valid weekdays
+        days = [d.strip() for d in re.split(r",|;", raw_days)]
+        available_days = [d for d in days if d in all_days]
+
 
 
     # ===============================
@@ -371,6 +378,7 @@ with st.sidebar.expander("📞 General Contact Numbers", expanded=False):
     ]
     for num in general_numbers:
         st.markdown(f"📱 {num}")
+
 
 
 
