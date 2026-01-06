@@ -224,19 +224,20 @@ elif menu == "📅 Book Appointment":
     doc_row = df[df["Doctor Name"] == doctor].iloc[0]
 
     # Parse available days (UNCHANGED)
+    # Parse available days based on your data formats
     raw_days = doc_row["Available days"].lower().strip()
-    if any(x in raw_days for x in ["all", "every", "daily"]):
-        available_days = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
-    elif "-" in raw_days:
-        start, end = raw_days.split("-")
-        days_full = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
-        abbr_map = {"mon":"monday","tue":"tuesday","wed":"wednesday","thu":"thursday",
-                    "fri":"friday","sat":"saturday","sun":"sunday"}
-        start = abbr_map.get(start[:3], start)
-        end = abbr_map.get(end[:3], end)
-        available_days = days_full[days_full.index(start):days_full.index(end)+1]
+    all_days = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
+    
+    if "available all days" in raw_days:
+        available_days = all_days
+    elif "not available on" in raw_days:
+        # Extract the days after "not available on"
+        excluded = re.findall(r"monday|tuesday|wednesday|thursday|friday|saturday|sunday", raw_days)
+        available_days = [d for d in all_days if d not in excluded]
     else:
-        available_days = [d.strip() for d in raw_days.split(",")]
+        # Fallback: assume comma separated available days
+        available_days = [d.strip() for d in raw_days.split(",") if d.strip() in all_days]
+
 
     # ===============================
     # FIXED TIME PARSING
@@ -370,6 +371,7 @@ with st.sidebar.expander("📞 General Contact Numbers", expanded=False):
     ]
     for num in general_numbers:
         st.markdown(f"📱 {num}")
+
 
 
 
