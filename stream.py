@@ -11,10 +11,7 @@ import re
 # ===============================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 APPOINTMENTS_FILE = os.path.join(BASE_DIR, "appointments.csv")
-st.write("📂 CURRENT WORKING DIR:", os.getcwd())
-st.write("BASE_DIR:", BASE_DIR)
-st.write("Appointments file path:", APPOINTMENTS_FILE)
-st.write("File exists:", os.path.exists(APPOINTMENTS_FILE))
+
 
 
 if not os.path.exists(APPOINTMENTS_FILE):
@@ -484,6 +481,7 @@ with st.sidebar.expander("📞 General Contact Numbers", expanded=False):
     ]
     for num in general_numbers:
         st.markdown(f"📱 {num}")
+
 
 
 
