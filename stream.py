@@ -205,7 +205,7 @@ else:
         st.sidebar.error(f"Could not load appointments: {e}")
 menu = st.sidebar.radio(
     "Navigate",
-    ["💬 Chatbot", "📅 Book Appointment", "👨⚕️ Doctors",, "ℹ️ About"]
+    ["💬 Chatbot", "📅 Book Appointment", "👨⚕️ Doctors", "ℹ️ About"]
 )
 
 
@@ -484,6 +484,7 @@ with st.sidebar.expander("📞 General Contact Numbers", expanded=False):
     ]
     for num in general_numbers:
         st.markdown(f"📱 {num}")
+
 
 
 
