@@ -178,6 +178,19 @@ if menu == "💬 Chatbot":
         st.markdown(f"**{role}:** {msg}")
 
 # ===============================
+
+elif menu == "ℹ️ About":   
+    st.markdown(
+        """
+        ### 🏥 About PRS Hospital
+        **PRS Hospital, Thiruvananthapuram**
+
+        ✔ Multi-specialty hospital  
+        ✔ Experienced doctors  
+        ✔ Consultation: 9 AM – 6 PM  
+        ✔ Easy online appointment booking  
+        """
+    )
 # DOCTORS PAGE
 # ===============================
 elif menu == "👨⚕️ Doctors":
@@ -400,6 +413,7 @@ with st.sidebar.expander("📞 General Contact Numbers", expanded=False):
     ]
     for num in general_numbers:
         st.markdown(f"📱 {num}")
+
 
 
 
