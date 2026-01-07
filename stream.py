@@ -179,7 +179,7 @@ if menu == "💬 Chatbot":
 
 # ===============================
 
-elif elif "About" in menu: 
+elif "About" in menu: 
     st.markdown(
         """
         ### 🏥 About PRS Hospital
@@ -407,6 +407,7 @@ with st.sidebar.expander("📞 General Contact Numbers", expanded=False):
     ]
     for num in general_numbers:
         st.markdown(f"📱 {num}")
+
 
 
 
