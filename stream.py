@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta, time
+from zoneinfo import ZoneInfo
+
 import os
 import re  
 
@@ -9,6 +11,11 @@ import re
 # ===============================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 APPOINTMENTS_FILE = os.path.join(BASE_DIR, "appointments.csv")
+st.write("📂 CURRENT WORKING DIR:", os.getcwd())
+st.write("BASE_DIR:", BASE_DIR)
+st.write("Appointments file path:", APPOINTMENTS_FILE)
+st.write("File exists:", os.path.exists(APPOINTMENTS_FILE))
+
 
 if not os.path.exists(APPOINTMENTS_FILE):
     pd.DataFrame(
@@ -97,7 +104,52 @@ def parse_consultation_ranges(text):
 
     return ranges
 
+def parse_available_days(text):
+    text = text.lower().strip()
 
+    days = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
+    day_map = {
+        "mon": "monday", "tue": "tuesday", "wed": "wednesday",
+        "thu": "thursday", "fri": "friday", "sat": "saturday", "sun": "sunday"
+    }
+
+    for k, v in day_map.items():
+        text = re.sub(rf"\b{k}\b", v, text)
+
+    if "all" in text:
+        return days
+
+    if "except" in text or "not available" in text:
+        excluded = re.findall("|".join(days), text)
+        return [d for d in days if d not in excluded]
+
+    if "to" in text or "-" in text:
+        match = re.findall("|".join(days), text)
+        if len(match) == 2:
+            start = days.index(match[0])
+            end = days.index(match[1])
+            return days[start:end+1] if start <= end else days[start:] + days[:end+1]
+
+    found = re.findall("|".join(days), text)
+    return list(dict.fromkeys(found))
+
+def generate_slots(date, consultation_ranges):
+    tz = ZoneInfo("Asia/Kolkata")
+    now = datetime.now(tz)
+    slots = []
+
+    for start, end in consultation_ranges:
+        current = datetime.combine(date, start).replace(tzinfo=tz)
+        end_dt = datetime.combine(date, end).replace(tzinfo=tz)
+
+        BUFFER = timedelta(minutes=30)
+        while current <= end_dt:
+            # Block past time only for today
+            if date != now.date() or current >= now + BUFFER:
+                slots.append(current.time())
+            current += timedelta(minutes=15)
+
+    return slots
 
 # ===============================
 # PAGE CONFIG
@@ -153,11 +205,9 @@ else:
         st.sidebar.error(f"Could not load appointments: {e}")
 menu = st.sidebar.radio(
     "Navigate",
-    ["💬 Chatbot", "📅 Book Appointment", "👨‍⚕️ Doctors", "ℹ️ About"]
+    ["💬 Chatbot", "📅 Book Appointment", "👨⚕️ Doctors",, "ℹ️ About"]
 )
 
-# Sidebar content (specialities, location, phone numbers, admin login)...
-# [UNCHANGED]
 
 # ===============================
 # CHATBOT PAGE
@@ -177,10 +227,27 @@ if menu == "💬 Chatbot":
         st.markdown(f"**{role}:** {msg}")
 
 # ===============================
+#About
+#================================
+elif menu == "ℹ️ About":   
+    st.markdown(
+        """
+        ### 🏥 About PRS Hospital
+        **PRS Hospital, Thiruvananthapuram**
+
+        ✔ Multi-specialty hospital  
+        ✔ Experienced doctors  
+        ✔ Consultation: 9 AM – 6 PM  
+        ✔ Easy online appointment booking  
+        """
+    )
+
+
+#================================
 # DOCTORS PAGE
 # ===============================
-elif menu == "👨‍⚕️ Doctors":
-    st.subheader("👨‍⚕️ All Doctors")
+elif menu == "👨⚕️ Doctors":
+    st.subheader("👨⚕️ All Doctors")
     display_df = df.copy()
     for i in range(0, len(display_df), 3):
         cols = st.columns(3)
@@ -197,7 +264,7 @@ elif menu == "👨‍⚕️ Doctors":
                         box-shadow: 2px 2px 12px rgba(0,0,0,0.08);
                         text-align:center;
                     ">
-                    <h4 style="margin-bottom:5px;">👨‍⚕️ {r['Doctor Name']}</h4>
+                    <h4 style="margin-bottom:5px;">👨⚕️ {r['Doctor Name']}</h4>
                     <p style="margin:0;">🩺 {r['Speciality']}</p>
                     <p style="margin:0;">⏰ {r['Consultation Time']}</p>
                     <p style="margin:0;">📅 {r['Available days']}</p>
@@ -212,7 +279,6 @@ elif menu == "👨‍⚕️ Doctors":
 # ===============================
 
 
-
 # BOOK APPOINTMENT PAGE
 # ===============================
 # ===============================
@@ -224,83 +290,116 @@ elif menu == "📅 Book Appointment":
     phone = st.text_input("📞 Phone Number")
     
     doctor_list = df["Doctor Name"].unique()
-    doctor = st.selectbox("👨‍⚕️ Select Doctor", sorted(doctor_list))
+    doctor = st.selectbox("👨⚕️ Select Doctor", sorted(doctor_list))
     doc_row = df[df["Doctor Name"] == doctor].iloc[0]
 
     # Parse available days
-    raw_days = doc_row["Available days"].lower().strip()
-    all_days = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
-    available_days = []
+    available_days = parse_available_days(doc_row["Available days"])
 
-    if "available all days" in raw_days:
-        available_days = all_days
-    elif "not available on" in raw_days:
-        excluded = re.findall(r"monday|tuesday|wednesday|thursday|friday|saturday|sunday", raw_days)
-        available_days = [d for d in all_days if d not in excluded]
-    else:
-        days = [d.strip() for d in re.split(r",|;", raw_days)]
-        available_days = [d for d in days if d in all_days]
+    if not available_days:
+        st.error("❌ Doctor availability not set correctly")
+        st.stop()
 
     # Parse consultation time ranges
     consultation_ranges = parse_consultation_ranges(doc_row["Consultation Time"])
 
     # Calendar for date selection (next 7 days)
-    today = datetime.now().date()
+    today = datetime.now(ZoneInfo("Asia/Kolkata")).date()
+
     valid_dates = [today + timedelta(days=i) for i in range(0, 7)]
     valid_dates = [d for d in valid_dates if d.strftime("%A").lower() in available_days]
 
     if not valid_dates:
         st.warning("❌ This doctor has no available days in the next 7 days.")
         st.stop()
-
-    date = st.date_input(
+    date = st.selectbox(
         "📆 Select Date",
-        min_value=min(valid_dates),
-        max_value=max(valid_dates),
-        value=min(valid_dates)
+        valid_dates,
+        format_func=lambda d: d.strftime("%A, %d %b %Y")
     )
 
     # TIME SELECTION
-    if date == today:
-        # Filter consultation slots to future times only
-        min_time = datetime.now().time()
-        future_slots = [start for start, end in consultation_ranges if start > min_time]
+    # TIME SELECTION (SINGLE SOURCE OF TRUTH)
 
-        if not future_slots:
-            st.warning("⚠️ No more available slots today. Please choose another day.")
-            st.stop()
-        selected_time = st.time_input("⏰ Select Time", value=future_slots[0])
-        if selected_time < datetime.now().time():
-            st.error("❌ Cannot book a time in the past today")
-            st.stop()
-    else:
-        selected_time = st.time_input("⏰ Select Time", value=consultation_ranges[0][0])
-
-    # Validate selected time against consultation hours
-    if not any(start <= selected_time <= end for start, end in consultation_ranges):
-        allowed = ", ".join(
-            f"{s.strftime('%I:%M %p')}–{e.strftime('%I:%M %p')}" for s, e in consultation_ranges
-        )
-        st.error(f"❌ Allowed time: {allowed}")
+    slots = generate_slots(date, consultation_ranges)
+    if date == today and not slots:
+        st.warning("⚠️ Doctor session is over for today. Please select another date.")
         st.stop()
+
+
+    if not slots:
+        st.warning("❌ No available slots for this day")
+        st.stop()
+
+    selected_time = st.selectbox(
+        "⏰ Select Time",
+        slots,
+        format_func=lambda t: t.strftime("%I:%M %p")
+    )
 
     time_str = selected_time.strftime("%I:%M%p").lstrip("0")
 
-    # CONFIRM APPOINTMENT
     if st.button("✅ Confirm Appointment"):
+
+    # 🔐 HARD BLOCK — FINAL AUTHORITY CHECK
+        now = datetime.now(ZoneInfo("Asia/Kolkata")).replace(second=0, microsecond=0)
+
+        selected_datetime = datetime.combine(date, selected_time).replace(
+            tzinfo=ZoneInfo("Asia/Kolkata")
+        )
+        st.write("🕒 DEBUG NOW:", now)
+        st.write("📅 DEBUG SELECTED:", selected_datetime)
+
+        if selected_datetime < now:
+            st.error("❌ Cannot book a past date or time")
+            st.stop()
+
         if not patient_name.strip():
             st.error("❌ Please enter patient name")
             st.stop()
+
         if not phone.isdigit() or len(phone) != 10:
             st.error("❌ Enter a valid 10-digit phone number")
             st.stop()
 
         appt_df = pd.read_csv(APPOINTMENTS_FILE)
-        count = appt_df[(appt_df["Doctor Name"] == doctor) & (appt_df["Date"] == date.isoformat())].shape[0]
+        # 🚫 BLOCK SAME PATIENT MULTIPLE BOOKINGS (per doctor per day)
+        already_booked = appt_df[
+            (appt_df["Doctor Name"] == doctor) &
+            (appt_df["Date"] == date.isoformat()) &
+            (
+                (appt_df["Phone"] == phone) |
+                (appt_df["Patient Name"].str.lower() == patient_name.lower())
+            )
+        ]
+
+        if not already_booked.empty:
+            st.error("❌ You have already booked an appointment with this doctor for this day")
+            st.stop()
+
+
+        # 🚫 BLOCK SAME TIME SLOT
+        existing = appt_df[
+            (appt_df["Doctor Name"] == doctor) &
+            (appt_df["Date"] == date.isoformat()) &
+            (appt_df["Time"] == time_str)
+        ]
+
+        if not existing.empty:
+            st.error("❌ This time slot is already booked")
+            st.stop()
+
+        # 🚫 DAILY LIMIT (20)
+        count = appt_df[
+            (appt_df["Doctor Name"] == doctor) &
+            (appt_df["Date"] == date.isoformat())
+        ].shape[0]
+
         if count >= 20:
             st.error("❌ Slots full for this doctor on selected day")
             st.stop()
 
+        # ✅ SAVE APPOINTMENT
         appt_df.loc[len(appt_df)] = {
             "Doctor Name": doctor,
             "Patient Name": patient_name,
@@ -309,13 +408,19 @@ elif menu == "📅 Book Appointment":
             "Time": time_str,
             "Reminder Sent": False
         }
+
         appt_df.to_csv(APPOINTMENTS_FILE, index=False)
-        send_mock_sms(phone, f"PRS Hospital: Appointment confirmed with {doctor} on {date.strftime('%d %b')} at {time_str}.")
-        st.success(f"✅ Appointment confirmed with {doctor} on {date.strftime('%d %B')} at {time_str}")
-        st.info("📩 Confirmation SMS sent (simulated)")
-
-
+        send_mock_sms(
+            phone,
+            f"PRS Hospital: Appointment confirmed with {doctor} on "
+            f"{date.strftime('%d %b')} at "
+            f"{selected_time.strftime('%I:%M%p').lstrip('0')}."
+        )
+        st.success("✅ Appointment confirmed")
+        
+        st.rerun()
 # ===============================
+
 
 
 # Hospital Info
@@ -379,6 +484,7 @@ with st.sidebar.expander("📞 General Contact Numbers", expanded=False):
     ]
     for num in general_numbers:
         st.markdown(f"📱 {num}")
+
 
 
 
