@@ -179,7 +179,7 @@ if menu == "💬 Chatbot":
 
 # ===============================
 
-elif menu == "ℹ️ About":   
+elif elif "About" in menu: 
     st.markdown(
         """
         ### 🏥 About PRS Hospital
@@ -226,8 +226,7 @@ elif menu == "👨⚕️ Doctors":
 # ===============================
 
 
-# BOOK APPOINTMENT PAGE
-# ===============================
+
 # ===============================
 # BOOK APPOINTMENT PAGE
 # ===============================
@@ -343,11 +342,6 @@ elif menu == "📅 Book Appointment":
         )
         st.success("✅ Appointment confirmed")
 
-    
-    
-    
-    # CONFIRM APPOINTMENT
-
         
 
 # ===============================
@@ -413,6 +407,7 @@ with st.sidebar.expander("📞 General Contact Numbers", expanded=False):
     ]
     for num in general_numbers:
         st.markdown(f"📱 {num}")
+
 
 
 
