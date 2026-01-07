@@ -360,19 +360,7 @@ elif menu == "📅 Book Appointment":
             st.stop()
 
         appt_df = pd.read_csv(APPOINTMENTS_FILE)
-        # 🚫 BLOCK SAME PATIENT MULTIPLE BOOKINGS (per doctor per day)
-        already_booked = appt_df[
-            (appt_df["Doctor Name"] == doctor) &
-            (appt_df["Date"] == date.isoformat()) &
-            (
-                (appt_df["Phone"] == phone) |
-                (appt_df["Patient Name"].str.lower() == patient_name.lower())
-            )
-        ]
 
-        if not already_booked.empty:
-            st.error("❌ You have already booked an appointment with this doctor for this day")
-            st.stop()
 
 
         # 🚫 BLOCK SAME TIME SLOT
@@ -481,6 +469,7 @@ with st.sidebar.expander("📞 General Contact Numbers", expanded=False):
     ]
     for num in general_numbers:
         st.markdown(f"📱 {num}")
+
 
 
 
